@@ -1,0 +1,64 @@
+[
+  {
+    "op": "remove",
+    "path": "/0/dh_products/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/1/dh_products/0/uuid"
+  },
+  {
+    "op": "test",
+    "path": "",
+    "value": [
+      {
+        "active": true,
+        "address_line_1": "Address",
+        "address_line_2": null,
+        "address_line_3": null,
+        "address_line_4": null,
+        "bookmarked": [],
+        "clinician_bookmark": false,
+        "country": "",
+        "dh_products": [
+          {
+            "closed_date": null,
+            "opened_date": "2000-01-01",
+            "product_name": "GDM"
+          }
+        ],
+        "display_name": "Theme Hospital",
+        "locality": null,
+        "location_type": "",
+        "ods_code": "L20",
+        "parents": [],
+        "postcode": "",
+        "region": null
+      },
+      {
+        "active": true,
+        "address_line_1": "Address",
+        "address_line_2": null,
+        "address_line_3": null,
+        "address_line_4": null,
+        "bookmarked": [],
+        "clinician_bookmark": false,
+        "country": "",
+        "dh_products": [
+          {
+            "closed_date": null,
+            "opened_date": "2010-01-01",
+            "product_name": "GDM"
+          }
+        ],
+        "display_name": "Alternate Hospital",
+        "locality": null,
+        "location_type": "",
+        "ods_code": "L21",
+        "parents": [],
+        "postcode": "",
+        "region": null
+      }
+    ]
+  }
+]

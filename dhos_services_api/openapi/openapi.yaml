@@ -1,0 +1,5495 @@
+openapi: 3.0.3
+info:
+  description: The DHOS Services API is responsible for storing and retrieving information
+    about patients, clinicians and locations.
+  title: DHOS Services API
+  version: 1.2.2
+paths:
+  /running:
+    get:
+      summary: Verify service is running
+      description: Verifies that the service is running. Used for monitoring in kubernetes.
+      tags:
+      - monitoring
+      responses:
+        '200':
+          description: If we respond, we are running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  running:
+                    type: boolean
+                    example: true
+      operationId: flask_batteries_included.blueprint_monitoring.app_running
+  /version:
+    get:
+      summary: Get version information
+      description: Get the version number, circleci build number, and git hash.
+      tags:
+      - monitoring
+      responses:
+        '200':
+          description: Version numbers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  circle:
+                    type: string
+                    example: '1234'
+                  hash:
+                    type: string
+                    example: 366c204
+      operationId: flask_batteries_included.blueprint_monitoring.app_version
+  /dhos/v1/patient_list:
+    post:
+      summary: Retrieve patients by UUIDs
+      description: Retrieve a list of patients using the UUIDs provided in the request
+        body.
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product with which patients should be associated
+        schema:
+          type: string
+          example: GDM
+      - name: compact
+        in: query
+        required: false
+        description: Whether to return patient in compact form
+        schema:
+          type: boolean
+          default: false
+      requestBody:
+        description: List of patient UUIDs
+        required: true
+        content:
+          application/json:
+            schema:
+              x-body-name: patient_uuids
+              type: array
+              items:
+                type: string
+                example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      responses:
+        '200':
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.retrieve_patients_by_uuids
+      security:
+      - bearerAuth: []
+    get:
+      summary: Retrieve patient list
+      description: Retrieve a list of patients by location and product
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product with which patients should be associated
+        schema:
+          type: string
+          example: GDM
+      - name: locs
+        in: query
+        required: false
+        description: Filter patients to those associated with this comma-separated
+          list of location UUIDs.
+        schema:
+          type: string
+          example: 0480256a-4dd1-499b-b194-ec754ecfddf3
+      responses:
+        '200':
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientDiabetesResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.retrieve_patient_list
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}:
+    get:
+      summary: Get patient by UUID
+      description: Get patient with the provided UUID
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      - name: type
+        in: query
+        required: false
+        description: Product name (deprecated - please use product_name instead)
+        schema:
+          type: string
+          example: GDM
+      - name: product_name
+        in: query
+        required: false
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      responses:
+        '200':
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.get_patient
+      security:
+      - bearerAuth: []
+    patch:
+      summary: Update patient
+      description: 'Update the patient with the provided UUID using the details in
+        the request body. Note: this endpoint uses recursive patch and can be used
+        to update nested objects.'
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      requestBody:
+        description: Patient details to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdateRequest'
+              x-body-name: update_details
+      responses:
+        '200':
+          description: Updated patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.update_patient
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient:
+    get:
+      summary: Get patients by identifier
+      description: Get patients by the identifier provided in the query parameters.
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product name
+        schema:
+          type: string
+          example: SEND
+      - name: identifier_type
+        in: query
+        required: true
+        description: Type of identifier
+        schema:
+          type: string
+          enum:
+          - NHS_NUMBER
+          - nhs_number
+          - MRN
+          - mrn
+          - HOSPITAL_NUMBER
+          - hospital_number
+          example: nhs_number
+      - name: identifier_value
+        in: query
+        required: true
+        description: Value of identifier
+        schema:
+          type: string
+          example: '1234567890'
+      responses:
+        '200':
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.get_patients_by_product_and_identifier
+      security:
+      - bearerAuth: []
+    post:
+      summary: Create patient
+      description: Create a patient using the details provided in the request body.
+      tags:
+      - patient
+      parameters:
+      - name: type
+        in: query
+        required: false
+        description: Product name (deprecated - please use product_name instead)
+        schema:
+          type: string
+          example: GDM
+      - name: product_name
+        in: query
+        required: false
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdateRequest'
+              x-body-name: patient_details
+      responses:
+        '200':
+          description: New patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.create_patient
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient-abbreviated/{patient_id}:
+    get:
+      summary: Get abbreviated patient by UUID
+      description: 'Get abbreviated details for the patient with the provided UUID.
+        This endpoint was designed to be used by mobile apps. Note: this endpoint
+        is deprecated, please use GET /dhos/v1/patient/<patient_id>'
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      responses:
+        '200':
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbbreviatedPatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.get_patient_abbreviated
+      deprecated: true
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}/delete:
+    patch:
+      summary: Remove details from patient
+      description: Remove the details in the request body from the patient with the
+        provided UUID. Note that this endpoint does not remove the patient itself.
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      requestBody:
+        description: 'Details to remove from patient: This endpoint can only delete
+          individual items from a collection such as a list or tuple. It will ignore
+          a single key-value pair e.g. { "phone_number" : "01234999999" }.'
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdateRequest'
+              x-body-name: fields_to_remove
+      responses:
+        '200':
+          description: Updated patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.remove_from_patient
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}/terms_agreement:
+    post:
+      summary: Create patient terms of service agreement
+      description: Create a new patient terms of service agreement using the details
+        provided in the request body.
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      requestBody:
+        description: Terms of service agreement details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientTermsRequest'
+              x-body-name: terms_details
+      responses:
+        '200':
+          description: New terms of service agreement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientTermsResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.create_patient_tos
+      deprecated: true
+      security:
+      - bearerAuth: []
+  /dhos/v2/patient/{patient_id}/terms_agreement:
+    post:
+      summary: Create patient terms of service agreement
+      description: Create a new patient terms of service agreement using the details
+        provided in the request body.
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      requestBody:
+        description: Terms of service agreement details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientTermsRequestV2'
+              x-body-name: terms_details
+      responses:
+        '200':
+          description: New terms of service agreement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientTermsResponseV2'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.create_patient_tos_v2
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}/product/{product_id}/close:
+    post:
+      summary: Close (archive) patient
+      description: 'Close (archive) a product and patient with the provided UUIDs
+        using the details provided in the request body. Note: you can only archive
+        a GDM product.'
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      - name: product_id
+        in: path
+        required: true
+        description: Product UUID
+        schema:
+          type: string
+          example: 95b90947-fb5d-4445-bfb1-e2b1078d5057
+      requestBody:
+        description: Patient details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClosePatientRequest'
+              x-body-name: patient_details
+      responses:
+        '200':
+          description: Closed patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.close_patient
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/open_gdm_patients:
+    post:
+      summary: Retrieve activity alerting information
+      description: Retrieve activity alerting information for open GDM patients. Responds
+        with details of all open GDM patients that had their GDM product opened more
+        than 7 days ago.
+      tags:
+      - patient
+      responses:
+        '200':
+          description: Closed patient
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivityAlertingPatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.retrieve_open_gdm_patients
+      security:
+      - bearerAuth: []
+  /dhos/v1/location/{location_id}/gdm_patient:
+    get:
+      summary: Get GDM patients by location
+      description: Get GDM patients associated with the location UUID provided in
+        the request.
+      tags:
+      - patient
+      parameters:
+      - name: location_id
+        in: path
+        required: true
+        description: Location UUID
+        schema:
+          type: string
+          example: 0480256a-4dd1-499b-b194-ec754ecfddf3
+      - name: location_active
+        in: query
+        required: false
+        deprecated: true
+        description: Filter patients to those associated with locations that are active
+          (true) or inactive (false). If not provided, no filter is applied.
+        schema:
+          type: boolean
+          example: true
+      - name: current
+        in: query
+        required: false
+        description: Filter patients to active (true) or inactive (false). If not
+          provided, no filter is applied.
+        schema:
+          type: boolean
+          example: true
+      - name: include_all
+        in: query
+        required: false
+        description: Whether to include patients marked as having been created in
+          error
+        schema:
+          type: boolean
+          example: true
+      - name: diagnosis
+        in: query
+        required: false
+        description: Filter patients to those with a diagnosis matching this SNOMED
+          code.
+        schema:
+          type: string
+          example: '11687002'
+      responses:
+        '200':
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.get_gdm_patients_by_location
+      security:
+      - bearerAuth: []
+  /dhos/v2/location/{location_id}/patient:
+    get:
+      summary: Get patients by location
+      description: Get patients associated with the location with the provided UUID.
+      tags:
+      - patient
+      parameters:
+      - name: location_id
+        in: path
+        required: true
+        description: Location UUID
+        schema:
+          type: string
+          example: 0480256a-4dd1-499b-b194-ec754ecfddf3
+      - name: product_name
+        in: query
+        required: true
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      - name: active
+        in: query
+        required: false
+        description: Filter patients to active (true) or inactive (false). If not
+          provided, no filter is applied.
+        schema:
+          type: boolean
+          example: true
+      responses:
+        '200':
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.get_aggregated_patients
+      security:
+      - bearerAuth: []
+  /dhos/v1/location/{location_id}/patient/{patient_id}/bookmark:
+    post:
+      summary: Create a location-patient bookmark
+      description: Create a bookmark between the location and patient with the provided
+        UUIDs.
+      tags:
+      - patient
+      parameters:
+      - name: location_id
+        in: path
+        required: true
+        description: Location UUID
+        schema:
+          type: string
+          example: 99f86b12-0112-42be-a0bb-fbe8e65c6b2f
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      responses:
+        '200':
+          description: Updated patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.bookmark_patient
+      security:
+      - bearerAuth: []
+    delete:
+      summary: Delete a location-patient bookmark
+      description: Delete a bookmark between the location and patient with the provided
+        UUIDs.
+      tags:
+      - patient
+      parameters:
+      - name: location_id
+        in: path
+        required: true
+        description: Location UUID
+        schema:
+          type: string
+          example: 99f86b12-0112-42be-a0bb-fbe8e65c6b2f
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      responses:
+        '200':
+          description: Updated patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.remove_bookmark
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/validate/{nhs_number}:
+    post:
+      summary: Validate NHS number
+      description: Validate an NHS number and ensure it is not already known to the
+        platform.
+      tags:
+      - patient
+      parameters:
+      - name: nhs_number
+        in: path
+        required: true
+        description: NHS number to validate
+        schema:
+          type: string
+          example: '1111111111'
+      - name: type
+        in: query
+        required: false
+        description: Product name (deprecated - please use product_name instead)
+        schema:
+          type: string
+          example: GDM
+      - name: product_name
+        in: query
+        required: false
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      responses:
+        '200':
+          description: NHS number is valid and unique
+        '400':
+          description: NHS number is invalid
+        '409':
+          description: NHS number is known to the system
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.validate_patient_nhs_number
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/validate:
+    post:
+      summary: Validate patient information
+      description: Validate patient information, ensuring a patient isn't already
+        known to the platform. Checks a patient's hospital number (MRN) isn't already
+        known, and checks the combination of (first name, last name, date of birth)
+        isn't already known.
+      tags:
+      - patient
+      parameters:
+      - name: type
+        in: query
+        required: false
+        description: Product name (deprecated - please use product_name instead)
+        schema:
+          type: string
+          example: GDM
+      - name: product_name
+        in: query
+        required: false
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      requestBody:
+        description: Patient details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidatePatientRequest'
+              x-body-name: patient_identifiers
+      responses:
+        '200':
+          description: Patient is unique
+        '409':
+          description: Patient is known to the system
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.validate_patient_information
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/record/{record_id}:
+    get:
+      summary: Get patient by record UUID
+      description: Get patient with the provided record UUID
+      tags:
+      - patient
+      parameters:
+      - name: record_id
+        in: path
+        required: true
+        description: Patient record UUID
+        schema:
+          type: string
+          example: 29297b3c-1e51-4526-9d70-9f8b2b0c879f
+      - name: compact
+        in: query
+        required: false
+        description: Whether to return patient in compact form
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.get_patient_by_record
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/search:
+    get:
+      summary: Search for patients
+      description: 'Search for patients by query and filters. The search query is
+        optional, and will be used to check patient name (including partial matches),
+        full NHS number, and full hospital number (MRN). Note: this search is limited
+        to non-SEND patients.'
+      tags:
+      - patient
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: Search query
+        schema:
+          type: string
+          example: Jones
+      - name: product_name
+        in: query
+        required: true
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      - name: active
+        in: query
+        required: false
+        description: Filter patients to active (true) or inactive (false).
+        schema:
+          type: boolean
+          default: true
+      - name: locs
+        in: query
+        required: false
+        description: Filter patients to those associated with this comma-separated
+          list of location UUIDs.
+        schema:
+          type: string
+          example: 0480256a-4dd1-499b-b194-ec754ecfddf3
+      - name: modified_since
+        in: query
+        required: false
+        description: Filter patients to those modified since this datetime. Note,
+          if timezone is used, a `+` symbol should be passed as an URL-encoded character,
+          i.e. `%2B`
+        schema:
+          type: string
+          format: date-time
+          example: 2000-01-01T01:01:01.123%2B01:00
+      - name: expanded
+        in: query
+        required: false
+        description: Return a fully expanded model.
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.search_patients
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}/first_medication:
+    post:
+      summary: Record patient's first medication
+      description: 'Record a patient has taken medication for the first time. Note:
+        only works for GDM patients.'
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      requestBody:
+        description: First medication details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirstMedicationRequest'
+              x-body-name: first_medication
+      responses:
+        '204':
+          description: First medication recorded
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.record_first_medication
+      security:
+      - bearerAuth: []
+  /dhos/v2/patient/search:
+    post:
+      summary: Get patient search info matching specified patient UUIDs
+      description: 'Retrieve patients using the patients UUIDs provided in the request
+        body, and the filters provided in the request parameters.
+
+        (For GDM patient search use the v1 endpoint instead)'
+      tags:
+      - search
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: The search term
+        schema:
+          type: string
+          example: jones
+      requestBody:
+        description: List of patient UUIDs
+        required: true
+        content:
+          application/json:
+            schema:
+              x-body-name: patient_ids
+              type: array
+              items:
+                type: string
+                example: 2126393f-c86b-4bf2-9f68-42bb03a7b68a
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResultsResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.search_patients_by_uuids_v2
+      security:
+      - bearerAuth: []
+    get:
+      summary: Search for patients by search term
+      description: Search for patient by search term. Allows searching by MRN, NHS
+        number, first name or last name (For GDM patient search use the v1 endpoint
+        instead)
+      tags:
+      - search
+      parameters:
+      - name: q
+        in: query
+        required: true
+        description: The search term
+        schema:
+          type: string
+          example: Jones
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResultsResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.search_patients_by_term
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}/product/{product_id}/stop_monitoring:
+    post:
+      summary: Stop monitoring patient
+      description: "Stop monitoring a patient within a product with the provided UUIDs\
+        \ by\n    setting `Product.monitored_by_clinician` flag to `False`.\nDBm:\
+        \ marking a product as not monitored prevents user from sending\n    readings.\n\
+        GDm: Has no effect.\nSend: Has no effect."
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      - name: product_id
+        in: path
+        required: true
+        description: Product UUID
+        schema:
+          type: string
+          example: 95b90947-fb5d-4445-bfb1-e2b1078d5057
+      responses:
+        '200':
+          description: Patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.stop_monitoring_patient
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient/{patient_id}/product/{product_id}/start_monitoring:
+    post:
+      summary: Start monitoring patient
+      description: "Start monitoring a patient within a product with the provided\
+        \ UUIDs by\n    setting `Product.monitored_by_clinician` flag to `True`.\n\
+        DBm: marking a product as monitored allows user to send readings.\nGDm: Has\
+        \ no effect.\nSend: Has no effect."
+      tags:
+      - patient
+      parameters:
+      - name: patient_id
+        in: path
+        required: true
+        description: Patient UUID
+        schema:
+          type: string
+          example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      - name: product_id
+        in: path
+        required: true
+        description: Product UUID
+        schema:
+          type: string
+          example: 95b90947-fb5d-4445-bfb1-e2b1078d5057
+      responses:
+        '200':
+          description: Patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.start_monitoring_patient
+      security:
+      - bearerAuth: []
+  /dhos/v1/patient_uuids:
+    get:
+      summary: Get list of patient UUIDs
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      responses:
+        '200':
+          description: List of UUIDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.patient_uuids
+      security:
+      - bearerAuth: []
+  /dhos/v1/neo4j_patient_list:
+    post:
+      summary: Retrieve patients by UUIDs (neo4j - do not use in production)
+      description: Retrieve a list of patients using the UUIDs provided in the request
+        body.
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product with which patients should be associated
+        schema:
+          type: string
+          example: GDM
+      - name: compact
+        in: query
+        required: false
+        description: Whether to return patient in compact form
+        schema:
+          type: boolean
+          default: false
+      requestBody:
+        description: List of patient UUIDs
+        required: true
+        content:
+          application/json:
+            schema:
+              x-body-name: patient_uuids
+              type: array
+              items:
+                type: string
+                example: ff9279e6-7a70-4fbb-b532-eb8a602751ae
+      responses:
+        '200':
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.retrieve_patients_by_uuids_neo
+      deprecated: true
+      security:
+      - bearerAuth: []
+  /dhos/v1/neo4j_patient:
+    post:
+      summary: Create patient (neo4j - do not use in production)
+      description: Create a patient using the details provided in the request body.
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: false
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdateRequest'
+              x-body-name: patient_details
+      responses:
+        '200':
+          description: New patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.create_patient_neo
+      deprecated: true
+      security:
+      - bearerAuth: []
+  /dhos/v1/weekly_active_patients:
+    get:
+      summary: Get a year-week count of active patients
+      description: 'Patients are considered active if their DraysonHealthProduct has
+        is
+
+        open before or during the week and is closed during or after the week'
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      - name: start_date
+        in: query
+        required: false
+        description: Earliest date for active patients to be returned
+        schema:
+          type: string
+          format: date
+          example: '2020-01-01'
+      - name: end_date
+        in: query
+        required: false
+        description: Latest date for active patients to be returned
+        schema:
+          type: string
+          format: date
+          example: '2020-07-01'
+      responses:
+        '200':
+          description: Active patient counts by week
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActiveWeeklyPatientCountResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.weekly_active_patients
+      security:
+      - bearerAuth: []
+  /dhos/v1/daily_created_patients:
+    get:
+      summary: Get daily created patients
+      description: 'Get daily created patients based on their DraysonHealthProduct
+
+        opened_date by product_name'
+      tags:
+      - patient
+      parameters:
+      - name: product_name
+        in: query
+        required: true
+        description: Product name
+        schema:
+          type: string
+          example: GDM
+      - name: start_date
+        in: query
+        required: false
+        description: Earliest date for created patients to be returned
+        schema:
+          type: string
+          format: date
+          example: '2020-01-01'
+      - name: end_date
+        in: query
+        required: false
+        description: Latest date for created patients to be returned
+        schema:
+          type: string
+          format: date
+          example: '2020-07-01'
+      responses:
+        '200':
+          description: Daily patient counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyCreatedPatientCountsResponse'
+        default:
+          description: Error, e.g. 400 Bad Request, 503 Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      operationId: dhos_services_api.blueprint_patients.daily_created_patients
+      security:
+      - bearerAuth: []
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP response code
+          example: 404
+        message:
+          type: string
+          description: Message attached to response
+          example: Not Found
+      required:
+      - code
+      description: An error response in json format
+    LocationProductRequest:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: The product name
+          example: GDM
+        opened_date:
+          type: string
+          description: ISO8601 date for when product was opened for the location
+          example: '2020-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: ISO8601 date for when product was closed for the location
+          example: '2020-05-01'
+      required:
+      - opened_date
+      - product_name
+    LocationRequest:
+      type: object
+      properties:
+        location_type:
+          type: string
+          description: Location type code
+          example: '22232009'
+        ods_code:
+          type: string
+          description: ODS code used by the EPR to refer to the location
+          example: JW1-34
+        display_name:
+          type: string
+          description: Name used to display the location in product UIs
+          example: John Radcliffe Hospital
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: &id001
+          - 4556cdf3-b60f-486c-bba8-7b1c222fe02a
+          items:
+            type: string
+        active:
+          type: boolean
+          nullable: true
+          description: Whether the location is active
+          example: true
+        address_line_1:
+          type: string
+          nullable: true
+          description: First line of location address
+          example: 21 Spring Lane
+        address_line_2:
+          type: string
+          nullable: true
+          description: Second line of location address
+          example: Villageville
+        address_line_3:
+          type: string
+          nullable: true
+          description: Third line of location address
+          example: Townton
+        address_line_4:
+          type: string
+          nullable: true
+          description: Fourth line of location address
+          example: Cityland
+        postcode:
+          type: string
+          nullable: true
+          description: Location address postcode
+          example: OX1 1AA
+        country:
+          type: string
+          nullable: true
+          description: Location address country
+          example: United Kingdom
+        locality:
+          type: string
+          nullable: true
+          description: Location address locality
+          example: Oxfordshire
+        region:
+          type: string
+          nullable: true
+          description: Location address region
+          example: South East
+        score_system_default:
+          type: string
+          enum:
+          - news2
+          - meows
+          nullable: true
+          description: Default early warning score system for this location
+        uuid:
+          type: string
+          description: Location UUID
+        dh_products:
+          type: array
+          description: Products with which location should be associated
+          items:
+            $ref: '#/components/schemas/LocationProductRequest'
+        parents:
+          type: array
+          nullable: true
+          description: List of parent location UUIDs
+          example:
+          - eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+          items:
+            type: string
+        parent_ods_code:
+          type: string
+          nullable: true
+          description: ODS code used by EPR to refer to the location's parent
+          example: ABC-123
+      required:
+      - dh_products
+      - display_name
+      - location_type
+      - ods_code
+      description: Location request
+    LocationProductResponse:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: The product name
+          example: GDM
+        opened_date:
+          type: string
+          description: ISO8601 date for when product was opened for the location
+          example: '2020-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: ISO8601 date for when product was closed for the location
+          example: '2020-05-01'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - opened_date
+      - product_name
+      - uuid
+    LocationResponse:
+      type: object
+      properties:
+        location_type:
+          type: string
+          description: Location type code
+          example: '22232009'
+        ods_code:
+          type: string
+          description: ODS code used by the EPR to refer to the location
+          example: JW1-34
+        display_name:
+          type: string
+          description: Name used to display the location in product UIs
+          example: John Radcliffe Hospital
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: *id001
+          items:
+            type: string
+        active:
+          type: boolean
+          nullable: true
+          description: Whether the location is active
+          example: true
+        address_line_1:
+          type: string
+          nullable: true
+          description: First line of location address
+          example: 21 Spring Lane
+        address_line_2:
+          type: string
+          nullable: true
+          description: Second line of location address
+          example: Villageville
+        address_line_3:
+          type: string
+          nullable: true
+          description: Third line of location address
+          example: Townton
+        address_line_4:
+          type: string
+          nullable: true
+          description: Fourth line of location address
+          example: Cityland
+        postcode:
+          type: string
+          nullable: true
+          description: Location address postcode
+          example: OX1 1AA
+        country:
+          type: string
+          nullable: true
+          description: Location address country
+          example: United Kingdom
+        locality:
+          type: string
+          nullable: true
+          description: Location address locality
+          example: Oxfordshire
+        region:
+          type: string
+          nullable: true
+          description: Location address region
+          example: South East
+        score_system_default:
+          type: string
+          enum:
+          - news2
+          - meows
+          nullable: true
+          description: Default early warning score system for this location
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        dh_products:
+          type: array
+          description: Products with which location is associated
+          items:
+            $ref: '#/components/schemas/LocationProductResponse'
+        clinician_bookmark:
+          type: boolean
+          nullable: true
+          description: Whether the current user (determined by JWT) has bookmarked
+            the location
+          example: false
+        parents:
+          type: array
+          nullable: true
+          description: Parent locations
+          items:
+            $ref: '#/components/schemas/LocationResponse'
+        children:
+          type: array
+          description: UUIDs of child locations associated with this location
+          items:
+            type: string
+        bookmarked:
+          type: array
+          description: UUIDs of bookmarked patients in this location
+          items:
+            type: string
+      required:
+      - display_name
+      - location_type
+      - ods_code
+      - uuid
+      description: Location response
+    LocationUpdateRequest:
+      type: object
+      properties:
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: *id001
+          items:
+            type: string
+        active:
+          type: boolean
+          nullable: true
+          description: Whether the location is active
+          example: true
+        address_line_1:
+          type: string
+          nullable: true
+          description: First line of location address
+          example: 21 Spring Lane
+        address_line_2:
+          type: string
+          nullable: true
+          description: Second line of location address
+          example: Villageville
+        address_line_3:
+          type: string
+          nullable: true
+          description: Third line of location address
+          example: Townton
+        address_line_4:
+          type: string
+          nullable: true
+          description: Fourth line of location address
+          example: Cityland
+        postcode:
+          type: string
+          nullable: true
+          description: Location address postcode
+          example: OX1 1AA
+        country:
+          type: string
+          nullable: true
+          description: Location address country
+          example: United Kingdom
+        locality:
+          type: string
+          nullable: true
+          description: Location address locality
+          example: Oxfordshire
+        region:
+          type: string
+          nullable: true
+          description: Location address region
+          example: South East
+        score_system_default:
+          type: string
+          enum:
+          - news2
+          - meows
+          nullable: true
+          description: Default early warning score system for this location
+        location_type:
+          type: string
+          nullable: true
+          description: Location type code
+          example: '22232009'
+        parent_locations:
+          type: array
+          nullable: true
+          description: List of parent location UUIDs
+          example:
+          - eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+          items:
+            type: string
+        dh_products:
+          type: array
+          nullable: true
+          description: Products with which location should be associated
+          items:
+            $ref: '#/components/schemas/LocationProductRequest'
+      description: Location update request
+    LocationDeleteRequest:
+      type: object
+      properties:
+        parent_locations:
+          type: array
+          description: List of parent location UUIDs
+          example:
+          - eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+          items:
+            type: string
+      required:
+      - parent_locations
+      description: Location delete request
+    ClinicianProduct:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        opened_date:
+          type: string
+          description: Opened date
+          example: '2018-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: Closed date
+          example: '2018-06-01'
+        closed_reason:
+          type: string
+          nullable: true
+          description: Closed reason
+          example: Some reason
+        closed_reason_other:
+          type: string
+          nullable: true
+          description: Closed reason other
+          example: Some other reason
+        accessibility_discussed:
+          type: boolean
+          nullable: true
+          description: Whether accessibility was discussed
+          example: true
+        accessibility_discussed_date:
+          type: string
+          nullable: true
+          description: When was accessibility discussed
+          example: '2019-10-07'
+        accessibility_discussed_with:
+          type: string
+          nullable: true
+          description: UUID of Clinician that discussed accessibility requirements
+          example: 2ae1e5f0-2e64-405b-a5e2-96d38a688df1
+      required:
+      - opened_date
+      - product_name
+      description: Clinician product
+    ClinicianCreateRequest:
+      type: object
+      properties:
+        bookmarks:
+          type: array
+          nullable: true
+          description: List of bookmarked location UUIDs
+          example: &id002
+          - 2ae1e5f0-2e64-405b-a5e2-96d38a688df1
+          items:
+            type: string
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: &id003
+          - eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+          items:
+            type: string
+        can_edit_ews:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        can_edit_encounter:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        contract_expiry_eod_date:
+          type: string
+          format: date
+          nullable: true
+          description: Contract expiry date
+          example: '2020-12-31'
+        professional_registration_number:
+          type: string
+          nullable: true
+          description: Professional registration number
+          example: '321'
+        agency_name:
+          type: string
+          nullable: true
+          description: Agency name
+          example: XYZ Ltd
+        agency_staff_employee_number:
+          type: string
+          nullable: true
+          description: Agency staff employee number
+          example: '321'
+        email_address:
+          type: string
+          nullable: true
+          description: e-mail address
+          example: abc@xyz.com
+        booking_reference:
+          type: string
+          nullable: true
+          description: Booking reference
+          example: '4321'
+        analytics_consent:
+          type: boolean
+          nullable: true
+          description: Indicates if the user has given consent to analytics
+          example: true
+        send_entry_identifier:
+          type: string
+          nullable: true
+          description: Identifier used by clinician to log into SEND entry
+          example: '321'
+        login_active:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to log in
+          example: true
+        first_name:
+          type: string
+          description: First name
+          example: John
+        last_name:
+          type: string
+          description: last name
+          example: Roberts
+        phone_number:
+          type: string
+          description: Phone number
+          example: 01234098765
+        job_title:
+          type: string
+          description: Job title
+          example: Doctor
+        nhs_smartcard_number:
+          type: string
+          description: NHS Smartcard number
+          example: '012345'
+        locations:
+          type: array
+          description: List of UUIDs of locations with which the clinician is associated
+          example:
+          - eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+          items:
+            type: string
+        groups:
+          type: array
+          description: List of user groups assigned to
+          example:
+          - SEND Clinician
+          items:
+            type: string
+        products:
+          type: array
+          description: Products with which the clinician should be associated
+          example:
+          - product_name: SEND
+            opened_date: '2019-06-01'
+          items:
+            $ref: '#/components/schemas/ClinicianProduct'
+      required:
+      - first_name
+      - groups
+      - job_title
+      - last_name
+      - locations
+      - nhs_smartcard_number
+      - phone_number
+      - products
+      description: Clinician create request
+    ClinicianTermsRequest:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        version:
+          type: integer
+          description: Product version
+          example: 12
+        accepted_timestamp:
+          type: string
+          nullable: true
+          description: Accepted at timestamp
+          example: '2019-01-01T12:01:01.000Z'
+      required:
+      - product_name
+      - version
+      description: Create Clinician Terms of Service request
+    ClinicianTermsResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          nullable: true
+          description: UUID or object describing the user that created the object
+        modified_by:
+          nullable: true
+          description: UUID or object describing the user that modified the object
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        version:
+          type: integer
+          description: Product version
+          example: 12
+        accepted_timestamp:
+          type: string
+          nullable: true
+          description: Accepted at timestamp
+          example: '2019-01-01T12:01:01.000Z'
+      required:
+      - product_name
+      - uuid
+      - version
+      description: Create Clinician Terms of Service response
+    ClinicianUpdateRequest:
+      type: object
+      properties:
+        bookmarks:
+          type: array
+          nullable: true
+          description: List of bookmarked location UUIDs
+          example: *id002
+          items:
+            type: string
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: *id003
+          items:
+            type: string
+        can_edit_ews:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        can_edit_encounter:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        contract_expiry_eod_date:
+          type: string
+          format: date
+          nullable: true
+          description: Contract expiry date
+          example: '2020-12-31'
+        professional_registration_number:
+          type: string
+          nullable: true
+          description: Professional registration number
+          example: '321'
+        agency_name:
+          type: string
+          nullable: true
+          description: Agency name
+          example: XYZ Ltd
+        agency_staff_employee_number:
+          type: string
+          nullable: true
+          description: Agency staff employee number
+          example: '321'
+        email_address:
+          type: string
+          nullable: true
+          description: e-mail address
+          example: abc@xyz.com
+        booking_reference:
+          type: string
+          nullable: true
+          description: Booking reference
+          example: '4321'
+        analytics_consent:
+          type: boolean
+          nullable: true
+          description: Indicates if the user has given consent to analytics
+          example: true
+        send_entry_identifier:
+          type: string
+          nullable: true
+          description: Identifier used by clinician to log into SEND entry
+          example: '321'
+        login_active:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to log in
+          example: true
+        first_name:
+          type: string
+          nullable: true
+          description: First name
+          example: John
+        last_name:
+          type: string
+          nullable: true
+          description: last name
+          example: Roberts
+        phone_number:
+          type: string
+          nullable: true
+          description: Phone number
+          example: 01234098765
+        job_title:
+          type: string
+          nullable: true
+          description: Job title
+          example: Doctor
+        nhs_smartcard_number:
+          type: string
+          nullable: true
+          description: NHS Smartcard number
+          example: '012345'
+        locations:
+          type: array
+          nullable: true
+          description: List of UUIDs of locations with which the clinician is associated
+          example: &id004
+          - eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+          items:
+            type: string
+        groups:
+          type: array
+          nullable: true
+          description: List of user groups assigned to
+          example: &id005
+          - SEND Clinician
+          items:
+            type: string
+        products:
+          nullable: true
+          description: Products with which the clinician should be associated
+          example: &id006
+          - product_name: SEND
+            opened_date: '2019-06-01'
+          type: array
+          items:
+            $ref: '#/components/schemas/ClinicianProduct'
+      description: Clinician update request
+    ClinicianPasswordUpdateRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: Password
+          example: abc*_123
+      required:
+      - password
+      description: Clinician password update request
+    ClinicianRemoveRequest:
+      type: object
+      properties:
+        bookmarks:
+          type: array
+          nullable: true
+          description: List of bookmarked location UUIDs
+          example: *id002
+          items:
+            type: string
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: *id003
+          items:
+            type: string
+        can_edit_ews:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        can_edit_encounter:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        contract_expiry_eod_date:
+          type: string
+          format: date
+          nullable: true
+          description: Contract expiry date
+          example: '2020-12-31'
+        professional_registration_number:
+          type: string
+          nullable: true
+          description: Professional registration number
+          example: '321'
+        agency_name:
+          type: string
+          nullable: true
+          description: Agency name
+          example: XYZ Ltd
+        agency_staff_employee_number:
+          type: string
+          nullable: true
+          description: Agency staff employee number
+          example: '321'
+        email_address:
+          type: string
+          nullable: true
+          description: e-mail address
+          example: abc@xyz.com
+        booking_reference:
+          type: string
+          nullable: true
+          description: Booking reference
+          example: '4321'
+        analytics_consent:
+          type: boolean
+          nullable: true
+          description: Indicates if the user has given consent to analytics
+          example: true
+        send_entry_identifier:
+          type: string
+          nullable: true
+          description: Identifier used by clinician to log into SEND entry
+          example: '321'
+        login_active:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to log in
+          example: true
+        first_name:
+          type: string
+          nullable: true
+          description: First name
+          example: John
+        last_name:
+          type: string
+          nullable: true
+          description: last name
+          example: Roberts
+        phone_number:
+          type: string
+          nullable: true
+          description: Phone number
+          example: 01234098765
+        job_title:
+          type: string
+          nullable: true
+          description: Job title
+          example: Doctor
+        nhs_smartcard_number:
+          type: string
+          nullable: true
+          description: NHS Smartcard number
+          example: '012345'
+        locations:
+          type: array
+          nullable: true
+          description: List of UUIDs of locations with which the clinician is associated
+          example: *id004
+          items:
+            type: string
+        groups:
+          type: array
+          nullable: true
+          description: List of user groups assigned to
+          example: *id005
+          items:
+            type: string
+        products:
+          nullable: true
+          description: Products with which the clinician should be associated
+          example: *id006
+          type: array
+          items:
+            $ref: '#/components/schemas/ClinicianProduct'
+      description: Clinician remove request
+    ClinicianResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          nullable: true
+          description: UUID or object describing the user that created the object
+        modified_by:
+          nullable: true
+          description: UUID or object describing the user that modified the object
+        bookmarks:
+          type: array
+          nullable: true
+          description: List of bookmarked location UUIDs
+          example: *id002
+          items:
+            type: string
+        bookmarked_patients:
+          type: array
+          nullable: true
+          description: List of bookmarked patient UUIDs
+          example: *id003
+          items:
+            type: string
+        can_edit_ews:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        can_edit_encounter:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's early
+            warning score in SEND
+          example: true
+        contract_expiry_eod_date:
+          type: string
+          format: date
+          nullable: true
+          description: Contract expiry date
+          example: '2020-12-31'
+        professional_registration_number:
+          type: string
+          nullable: true
+          description: Professional registration number
+          example: '321'
+        agency_name:
+          type: string
+          nullable: true
+          description: Agency name
+          example: XYZ Ltd
+        agency_staff_employee_number:
+          type: string
+          nullable: true
+          description: Agency staff employee number
+          example: '321'
+        email_address:
+          type: string
+          nullable: true
+          description: e-mail address
+          example: abc@xyz.com
+        booking_reference:
+          type: string
+          nullable: true
+          description: Booking reference
+          example: '4321'
+        analytics_consent:
+          type: boolean
+          nullable: true
+          description: Indicates if the user has given consent to analytics
+          example: true
+        send_entry_identifier:
+          type: string
+          nullable: true
+          description: Identifier used by clinician to log into SEND entry
+          example: '321'
+        login_active:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to log in
+          example: true
+        first_name:
+          type: string
+          nullable: true
+          description: First name
+          example: John
+        last_name:
+          type: string
+          nullable: true
+          description: last name
+          example: Roberts
+        phone_number:
+          type: string
+          nullable: true
+          description: Phone number
+          example: 01234098765
+        job_title:
+          type: string
+          nullable: true
+          description: Job title
+          example: Doctor
+        nhs_smartcard_number:
+          type: string
+          nullable: true
+          description: NHS Smartcard number
+          example: '012345'
+        locations:
+          type: array
+          nullable: true
+          description: List of UUIDs of locations with which the clinician is associated
+          example: *id004
+          items:
+            type: string
+        groups:
+          type: array
+          nullable: true
+          description: List of user groups assigned to
+          example: *id005
+          items:
+            type: string
+        products:
+          nullable: true
+          description: Products with which the clinician should be associated
+          example: *id006
+          type: array
+          items:
+            $ref: '#/components/schemas/ClinicianProduct'
+        terms_agreement:
+          type: object
+          nullable: true
+          description: Latest terms agreement
+      required:
+      - uuid
+      description: Clinician response
+    CliniciansResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClinicianResponse'
+        total:
+          type: integer
+          description: Total clinicians in the database matching the request
+      required:
+      - results
+      - total
+      description: Clinicians response
+    ClinicianLocations:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name used to display the location for product
+          example: John Radcliffe Hospital
+        id:
+          type: string
+          description: Location UUID
+          example: eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+        products:
+          type: array
+          description: Products with which the clinician should be associated
+          example:
+          - product_name: SEND
+            opened_date: '2019-06-01'
+          items:
+            $ref: '#/components/schemas/ClinicianProduct'
+    ClinicianLoginResponse:
+      type: object
+      properties:
+        job_title:
+          type: string
+          description: Job title
+          example: Doctor
+        email_address:
+          type: string
+          nullable: true
+          description: e-mail address
+          example: abc@xyz.com
+        locations:
+          type: array
+          description: Locations with which the clinician should be associated
+          items:
+            $ref: '#/components/schemas/ClinicianLocations'
+        user_id:
+          type: string
+          description: User UUID of clinician
+          example: eb42ee95-6aa6-46b7-9c3e-0e96526747a6
+        groups:
+          type: array
+          description: List of user groups assigned to
+          example:
+          - SEND Clinician
+          items:
+            type: string
+        products:
+          type: array
+          description: Products with which the clinician should be associated
+          example:
+          - product_name: SEND
+            opened_date: '2019-06-01'
+          items:
+            $ref: '#/components/schemas/ClinicianProduct'
+        can_edit_ews:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to change a patient's SpO2
+            scale in SEND
+          example: true
+        can_edit_encounter:
+          type: boolean
+          nullable: true
+          description: Whether the clinician is allowed to modify an encounter
+          example: true
+      required:
+      - can_edit_ews
+      - email_address
+      - groups
+      - job_title
+      - locations
+      - products
+      - user_id
+      description: Create Clinician Terms of Service response
+    SearchPatient:
+      type: object
+      properties:
+        patient_uuid:
+          type: string
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        dob:
+          type: string
+          format: date
+          nullable: true
+        nhs_number:
+          type: string
+          nullable: true
+        hospital_number:
+          type: string
+          nullable: true
+        sex:
+          type: string
+          nullable: true
+        has_clinician_bookmark:
+          type: boolean
+      required:
+      - dob
+      - first_name
+      - has_clinician_bookmark
+      - hospital_number
+      - last_name
+      - nhs_number
+      - patient_uuid
+      - sex
+      title: Search result for a single patient
+    SearchResultsResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchPatient'
+      title: Search result
+    PatientTermsRequest:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product whose terms have been agreed to
+          example: GDM
+        version:
+          type: integer
+          description: Version number of terms agreed to
+          example: 3
+        accepted_timestamp:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+      required:
+      - product_name
+      - version
+      description: Patient terms agreement request
+    PatientTermsRequestV2:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product whose terms have been agreed to
+          example: GDM
+        tou_version:
+          type: integer
+          description: Version number of TOU terms agreed to
+          example: 3
+        tou_accepted_timestamp:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+        patient_notice_version:
+          type: integer
+          description: Version number of PN terms agreed to
+          example: 3
+        patient_notice_accepted_timestamp:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+      required:
+      - patient_notice_version
+      - product_name
+      - tou_version
+      description: Patient terms agreement request
+    PatientTermsResponseV2:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product whose terms have been agreed to
+          example: GDM
+        tou_version:
+          type: integer
+          description: Version number of TOU terms agreed to
+          example: 3
+        tou_accepted_timestamp:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+        patient_notice_version:
+          type: integer
+          description: Version number of PN terms agreed to
+          example: 3
+        patient_notice_accepted_timestamp:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - patient_notice_version
+      - product_name
+      - tou_version
+      - uuid
+      description: Patient terms agreement response
+    NoteRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          description: Contents of the note
+          example: Patient is a delight
+        clinician_uuid:
+          type: string
+          description: Clinician UUID
+          example: 48378ca6-d28b-424a-9408-f8e00b9af657
+      required:
+      - clinician_uuid
+      - content
+      description: Note request
+    ObservableEntityRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the observable entity
+          example: '443911005'
+        date_observed:
+          type: string
+          description: ISO8601 date for the observable entity
+          example: '2020-01-01'
+        value_as_string:
+          type: string
+          nullable: true
+          description: Observable entity value
+          example: '11'
+        metadata:
+          type: object
+          nullable: true
+          description: Metadata related to the observable entity
+          example: &id007
+            0hr: 50
+            1hr: 100
+            2hr: 75
+            3hr: null
+      required:
+      - date_observed
+      - sct_code
+      description: Observable entity request
+    NonMedicationActionRequest:
+      type: object
+      properties:
+        action_sct_code:
+          type: string
+          description: SNOMED code for the action
+          example: '281090004'
+      required:
+      - action_sct_code
+      description: Non medication action request
+    DoseRequest:
+      type: object
+      properties:
+        medication_id:
+          type: string
+          description: UUID of the medication
+          example: bbc1a393-818f-417a-a6e5-76f9338a6a1c
+        dose_amount:
+          type: number
+          description: Amount of the medication
+          example: 1.5
+        routine_sct_code:
+          type: string
+          nullable: true
+          description: SNOMED code for the dose
+          example: '12345'
+      required:
+      - dose_amount
+      - medication_id
+      description: Dose
+    ManagementPlanRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the management plan type
+          example: '386359008'
+        start_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan started
+          example: '2020-01-01'
+        end_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan ended
+          example: '2020-05-01'
+        actions:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/NonMedicationActionRequest'
+        doses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseRequest'
+      required:
+      - sct_code
+      description: Management plan request
+    ReadingsPlanRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the readings plan type
+          example: '33747003'
+        start_date:
+          type: string
+          description: ISO8601 date when plan started
+          example: '2020-01-01'
+        days_per_week_to_take_readings:
+          type: integer
+          description: Days per week patient is expected to take readings
+          example: 5
+        readings_per_day:
+          type: integer
+          description: Number of readings per day patient is expected to take
+          example: 4
+        end_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan ended
+          example: '2020-05-01'
+      required:
+      - days_per_week_to_take_readings
+      - readings_per_day
+      - sct_code
+      - start_date
+      description: Readings plan request
+    DiagnosisRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the diagnosis
+          example: '11687002'
+        diagnosis_other:
+          type: string
+          nullable: true
+          description: Freetext field for diagnosis description
+          example: Diabetes type 4
+        diagnosed:
+          type: string
+          nullable: true
+          description: ISO8601 date of diagnosis
+          example: '2020-01-01'
+        resolved:
+          type: string
+          nullable: true
+          description: ISO8601 date of resolution
+          example: '2020-01-01'
+        episode:
+          type: integer
+          nullable: true
+          example: 1
+        presented:
+          type: string
+          nullable: true
+          description: ISO8601 date of presentation
+          example: '2020-01-01'
+        diagnosis_tool:
+          type: array
+          nullable: true
+          description: List of SNOMED code for the diagnosis tools
+          example: &id008
+          - D0000011
+          items:
+            type: string
+        diagnosis_tool_other:
+          type: string
+          nullable: true
+          description: Freetext field for the diagnosis tool
+          example: My own intuition
+        risk_factors:
+          type: array
+          nullable: true
+          description: List of SNOMED code for risk factors
+          example: &id009
+          - '199228009'
+          items:
+            type: string
+        observable_entities:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/ObservableEntityRequest'
+        management_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ManagementPlanRequest'
+        readings_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ReadingsPlanRequest'
+      required:
+      - sct_code
+      description: Diagnosis request
+    BabyRequest:
+      type: object
+      properties:
+        sex:
+          type: string
+          nullable: true
+          description: SNOMED code for baby's sex
+          example: '248152002'
+        first_name:
+          type: string
+          nullable: true
+          description: Baby's first name
+          example: Joan
+        last_name:
+          type: string
+          nullable: true
+          description: Baby's last name
+          example: Speedwell
+        dob:
+          type: string
+          nullable: true
+          description: Baby's date of birth in ISO8601 format
+          example: '1978-05-06'
+        phone_number:
+          type: string
+          nullable: true
+          description: Baby's phone number
+          example: '07777777777'
+      description: Baby request
+    DeliveryRequest:
+      type: object
+      properties:
+        birth_outcome:
+          type: string
+          nullable: true
+          description: SNOMED code for birth outcome
+          example: '48782003'
+        outcome_for_baby:
+          type: string
+          nullable: true
+          description: SNOMED code for outcome for baby
+          example: '169826009'
+        neonatal_complications:
+          type: array
+          nullable: true
+          description: List of SNOMED codes for neonatal complications
+          example: &id010
+          - '52767006'
+          items:
+            type: string
+        neonatal_complications_other:
+          type: string
+          nullable: true
+          description: Freetext field for other neonatal complications
+          example: Baby is too cute
+        admitted_to_special_baby_care_unit:
+          type: boolean
+          nullable: true
+          description: Whether the patient was admitted to special baby care unit
+          example: false
+        birth_weight_in_grams:
+          type: integer
+          nullable: true
+          description: Birth weight (g)
+          example: 2000
+        length_of_postnatal_stay_for_baby:
+          type: integer
+          nullable: true
+          description: Length of postnatal stay for baby in days
+          example: 3
+        apgar_1_minute:
+          type: integer
+          nullable: true
+          description: APGAR score 1 minute after birth
+          example: 9
+        apgar_5_minute:
+          type: integer
+          nullable: true
+          description: APGAR score 5 minutes after birth
+          example: 10
+        feeding_method:
+          type: string
+          nullable: true
+          description: SNOMED code for feeding method
+          example: '226789007'
+        date_of_termination:
+          type: string
+          nullable: true
+          description: ISO8601 date of termination
+          example: '2020-01-01'
+        patient:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/BabyRequest'
+      description: Delivery request
+    PregnancyRequest:
+      type: object
+      properties:
+        estimated_delivery_date:
+          type: string
+          description: ISO8601 date of expected delivery
+          example: '2020-01-01'
+        planned_delivery_place:
+          type: string
+          nullable: true
+          description: SNOMED code for planned delivery place
+          example: '310586008'
+        length_of_postnatal_stay_in_days:
+          type: integer
+          nullable: true
+          description: Length of postnatal stay in days
+          example: 3
+        colostrum_harvesting:
+          type: boolean
+          nullable: true
+          description: Whether colostrum harvesting occurred
+          example: true
+        expected_number_of_babies:
+          type: integer
+          nullable: true
+          description: Expected number of babies
+          example: 1
+        pregnancy_complications:
+          type: array
+          nullable: true
+          description: List of SNOMED codes for any pregnancy complications
+          example: &id011
+          - '48194001'
+          items:
+            type: string
+        induced:
+          type: boolean
+          nullable: true
+          description: Whether pregnancy was induced
+          example: false
+        deliveries:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryRequest'
+        height_at_booking_in_mm:
+          type: integer
+          nullable: true
+          description: Height (mm) at booking
+          example: 1600
+        weight_at_diagnosis_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at diagnosis
+          example: 6000
+        weight_at_booking_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at booking
+          example: 6000
+        weight_at_36_weeks_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at 36 weeks' gestation
+          example: 6200
+        delivery_place:
+          type: string
+          nullable: true
+          description: SNOMED code for actual delivery place
+          example: D0000009
+        delivery_place_other:
+          type: string
+          nullable: true
+          description: Freetext field for actual delivery place
+          example: At home
+        first_medication_taken_recorded:
+          type: string
+          nullable: true
+          description: ISO8601 date for when medication was first taken
+          example: '2020-01-01'
+        first_medication_taken:
+          type: string
+          nullable: true
+          description: Description of when medication was first taken
+          example: 5 days ago
+      required:
+      - estimated_delivery_date
+      description: Pregnancy request
+    VisitRequest:
+      type: object
+      properties:
+        visit_date:
+          type: string
+          description: ISO8601 date of visit
+          example: '2020-01-01'
+        location:
+          type: string
+          description: UUID of location where visit occurred
+          example: ccc602d9-eef1-4e48-b012-8312274bcab1
+        summary:
+          type: string
+          nullable: true
+          description: Freetext summary of visit
+          example: Patient was healthy
+        diagnoses:
+          type: array
+          nullable: true
+          description: List of diagnosis UUIDs relevant to the visit
+          example: &id012
+          - 485d3d40-7c70-4b60-a3f3-f79ae1f55ff9
+          items:
+            type: string
+        clinician_uuid:
+          type: string
+          description: UUID of clinician with whom visit occurred
+          example: 963410f7-d92e-4b0a-9be1-f141df2a9d35
+      required:
+      - clinician_uuid
+      - location
+      - visit_date
+      description: Visit request
+    RecordHistoryRequest:
+      type: object
+      properties:
+        parity:
+          type: integer
+          nullable: true
+          description: Gestational parity (number of pregnancies carried beyond 20
+            weeks)
+          example: 2
+        gravidity:
+          type: integer
+          nullable: true
+          description: Gestational gravidity (number of pregnancies)
+          example: 2
+      description: Record history request
+    RecordRequest:
+      type: object
+      properties:
+        notes:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/NoteRequest'
+        diagnoses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisRequest'
+        pregnancies:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/PregnancyRequest'
+        visits:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitRequest'
+        history:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/RecordHistoryRequest'
+      description: Record request
+    AddressRequest:
+      type: object
+      properties:
+        address_line_1:
+          type: string
+          nullable: true
+          description: First line of address
+          example: Flat 14
+        address_line_2:
+          type: string
+          nullable: true
+          description: Second line of address
+          example: 11 Spring Close
+        address_line_3:
+          type: string
+          nullable: true
+          description: Third line of address
+          example: Summerville
+        address_line_4:
+          type: string
+          nullable: true
+          description: Fourth line of address
+          example: Autumn City
+        locality:
+          type: string
+          nullable: true
+          description: Locality of address
+          example: Wintershire
+        region:
+          type: string
+          nullable: true
+          description: Region of address
+          example: England
+        postcode:
+          type: string
+          nullable: true
+          description: Postcode of address
+          example: A11 111
+        country:
+          type: string
+          nullable: true
+          description: Country of address
+          example: United Kingdom
+        lived_from:
+          type: string
+          nullable: true
+          description: ISO8601 date for start of residence
+          example: '2017-09-01'
+        lived_until:
+          type: string
+          nullable: true
+          description: ISO8601 date for end of residence
+          example: '2019-03-23'
+      description: Address request
+    DhProductRequest:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        opened_date:
+          type: string
+          description: Opened date
+          example: '2018-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: Closed date
+          example: '2018-06-01'
+        closed_reason:
+          type: string
+          nullable: true
+          description: Closed reason
+          example: Some reason
+        closed_reason_other:
+          type: string
+          nullable: true
+          description: Closed reason other
+          example: Some other reason
+        accessibility_discussed:
+          type: boolean
+          nullable: true
+          description: Whether accessibility was discussed
+          example: true
+        accessibility_discussed_date:
+          type: string
+          nullable: true
+          description: When was accessibility discussed
+          example: '2019-10-07'
+        accessibility_discussed_with:
+          type: string
+          nullable: true
+          description: UUID of the clinician with whom accessibility was discussed
+          example: 6158fca0-b805-4d4a-9592-654fc1001a94
+      required:
+      - opened_date
+      - product_name
+      description: Drayson health product request
+    PatientRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          description: Patient's first name
+          example: Joan
+        last_name:
+          type: string
+          description: Patient's last name
+          example: Speedwell
+        hospital_number:
+          type: string
+          description: Patient's hospital number (MRN)
+          example: '232434'
+        record:
+          $ref: '#/components/schemas/RecordRequest'
+        phone_number:
+          type: string
+          nullable: true
+          description: Patient's phone number
+          example: '07777777777'
+        allowed_to_text:
+          type: boolean
+          nullable: true
+          description: Whether SMS messages can be sent to the patient
+          example: true
+        allowed_to_email:
+          type: boolean
+          nullable: true
+          description: Whether emails can be sent to the patient
+          example: true
+        dob:
+          type: string
+          nullable: true
+          description: Patient's date of birth in ISO8601 format
+          example: '1978-05-06'
+        dod:
+          type: string
+          nullable: true
+          description: Patient's date of death in ISO8601 format
+          example: '2020-01-01'
+        nhs_number:
+          type: string
+          nullable: true
+          description: Patient's 10-digit NHS number
+          example: '1111111111'
+        email_address:
+          type: string
+          nullable: true
+          description: Patient's email address
+          example: joan.speedwell@mail.com
+        ethnicity:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's ethnicity
+          example: '186019001'
+        ethnicity_other:
+          type: string
+          nullable: true
+          description: Freetext field for for patient's ethnicity
+          example: Extraterrestrial
+        sex:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's sex
+          example: '248152002'
+        height_in_mm:
+          type: integer
+          nullable: true
+          description: Height (mm)
+          example: 1600
+        weight_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g)
+          example: 6000
+        highest_education_level:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's highest education level
+          example: '224297003'
+        highest_education_level_other:
+          type: string
+          nullable: true
+          description: Freetext field for patient's highest education level
+          example: Arch-chancellor, Unseen University
+        accessibility_considerations:
+          type: array
+          nullable: true
+          description: List of SNOMED code for patient's accessibility considerations
+          example: &id013
+          - '105597003'
+          items:
+            type: string
+        accessibility_considerations_other:
+          type: string
+          nullable: true
+          description: Freetext field for patient's accessibility considerations
+          example: Patient has no ribs
+        other_notes:
+          type: string
+          nullable: true
+          description: Freeteext field for patient notes
+          example: Patient is delightful
+        locations:
+          type: array
+          nullable: true
+          description: UUIDs of locations with which patient is associated
+          example: &id014
+          - ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+          items:
+            type: string
+        personal_addresses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressRequest'
+        dh_products:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DhProductRequest'
+        fhir_resource_id:
+          type: string
+          nullable: true
+          description: Patient's ID in a trustomer's FHIR EPR system (null if the
+            patient is not presented there)
+          example: ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+      required:
+      - first_name
+      - hospital_number
+      - last_name
+      - record
+      description: Patient request
+    NoteUpdateRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          description: Contents of the note
+          example: Patient is a delight
+        clinician_uuid:
+          type: string
+          description: Clinician UUID
+          example: 48378ca6-d28b-424a-9408-f8e00b9af657
+      description: Note update request
+    ObservableEntityUpdateRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the observable entity
+          example: '443911005'
+        date_observed:
+          type: string
+          description: ISO8601 date for the observable entity
+          example: '2020-01-01'
+        value_as_string:
+          type: string
+          nullable: true
+          description: Observable entity value
+          example: '11'
+        metadata:
+          type: object
+          nullable: true
+          description: Metadata related to the observable entity
+          example: *id007
+      description: Observable entity update request
+    DoseUpdateRequest:
+      type: object
+      properties:
+        medication_id:
+          type: string
+          description: UUID of the medication
+          example: bbc1a393-818f-417a-a6e5-76f9338a6a1c
+        dose_amount:
+          type: number
+          description: Amount of the medication
+          example: 1.5
+        routine_sct_code:
+          type: string
+          nullable: true
+          description: SNOMED code for the dose
+          example: '12345'
+      description: Dose update request
+    ManagementPlanUpdateRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the management plan type
+          example: '386359008'
+        start_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan started
+          example: '2020-01-01'
+        end_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan ended
+          example: '2020-05-01'
+        actions:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/NonMedicationActionRequest'
+        doses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseUpdateRequest'
+      description: Management plan update request
+    ReadingsPlanUpdateRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the readings plan type
+          example: '33747003'
+        start_date:
+          type: string
+          description: ISO8601 date when plan started
+          example: '2020-01-01'
+        days_per_week_to_take_readings:
+          type: integer
+          description: Days per week patient is expected to take readings
+          example: 5
+        readings_per_day:
+          type: integer
+          description: Number of readings per day patient is expected to take
+          example: 4
+        end_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan ended
+          example: '2020-05-01'
+      description: Readings plan update request
+    DiagnosisUpdateRequest:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          nullable: true
+          description: SNOMED code for the diagnosis
+          example: '11687002'
+        diagnosis_other:
+          type: string
+          nullable: true
+          description: Freetext field for diagnosis description
+          example: Diabetes type 4
+        diagnosed:
+          type: string
+          nullable: true
+          description: ISO8601 date of diagnosis
+          example: '2020-01-01'
+        resolved:
+          type: string
+          nullable: true
+          description: ISO8601 date of resolution
+          example: '2020-01-01'
+        episode:
+          type: integer
+          nullable: true
+          example: 1
+        presented:
+          type: string
+          nullable: true
+          description: ISO8601 date of presentation
+          example: '2020-01-01'
+        diagnosis_tool:
+          type: array
+          nullable: true
+          description: List of SNOMED code for the diagnosis tools
+          example: *id008
+          items:
+            type: string
+        diagnosis_tool_other:
+          type: string
+          nullable: true
+          description: Freetext field for the diagnosis tool
+          example: My own intuition
+        risk_factors:
+          type: array
+          nullable: true
+          description: List of SNOMED code for risk factors
+          example: *id009
+          items:
+            type: string
+        observable_entities:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/ObservableEntityUpdateRequest'
+        management_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ManagementPlanUpdateRequest'
+        readings_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ReadingsPlanUpdateRequest'
+      description: Diagnosis update request
+    DeliveryUpdateRequest:
+      type: object
+      properties:
+        birth_outcome:
+          type: string
+          nullable: true
+          description: SNOMED code for birth outcome
+          example: '48782003'
+        outcome_for_baby:
+          type: string
+          nullable: true
+          description: SNOMED code for outcome for baby
+          example: '169826009'
+        neonatal_complications:
+          type: array
+          nullable: true
+          description: List of SNOMED codes for neonatal complications
+          example: *id010
+          items:
+            type: string
+        neonatal_complications_other:
+          type: string
+          nullable: true
+          description: Freetext field for other neonatal complications
+          example: Baby is too cute
+        admitted_to_special_baby_care_unit:
+          type: boolean
+          nullable: true
+          description: Whether the patient was admitted to special baby care unit
+          example: false
+        birth_weight_in_grams:
+          type: integer
+          nullable: true
+          description: Birth weight (g)
+          example: 2000
+        length_of_postnatal_stay_for_baby:
+          type: integer
+          nullable: true
+          description: Length of postnatal stay for baby in days
+          example: 3
+        apgar_1_minute:
+          type: integer
+          nullable: true
+          description: APGAR score 1 minute after birth
+          example: 9
+        apgar_5_minute:
+          type: integer
+          nullable: true
+          description: APGAR score 5 minutes after birth
+          example: 10
+        feeding_method:
+          type: string
+          nullable: true
+          description: SNOMED code for feeding method
+          example: '226789007'
+        date_of_termination:
+          type: string
+          nullable: true
+          description: ISO8601 date of termination
+          example: '2020-01-01'
+        patient:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/BabyRequest'
+      description: Delivery update request
+    PregnancyUpdateRequest:
+      type: object
+      properties:
+        estimated_delivery_date:
+          type: string
+          description: ISO8601 date of expected delivery
+          example: '2020-01-01'
+        planned_delivery_place:
+          type: string
+          nullable: true
+          description: SNOMED code for planned delivery place
+          example: '310586008'
+        length_of_postnatal_stay_in_days:
+          type: integer
+          nullable: true
+          description: Length of postnatal stay in days
+          example: 3
+        colostrum_harvesting:
+          type: boolean
+          nullable: true
+          description: Whether colostrum harvesting occurred
+          example: true
+        expected_number_of_babies:
+          type: integer
+          nullable: true
+          description: Expected number of babies
+          example: 1
+        pregnancy_complications:
+          type: array
+          nullable: true
+          description: List of SNOMED codes for any pregnancy complications
+          example: *id011
+          items:
+            type: string
+        induced:
+          type: boolean
+          nullable: true
+          description: Whether pregnancy was induced
+          example: false
+        deliveries:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryUpdateRequest'
+        height_at_booking_in_mm:
+          type: integer
+          nullable: true
+          description: Height (mm) at booking
+          example: 1600
+        weight_at_diagnosis_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at diagnosis
+          example: 6000
+        weight_at_booking_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at booking
+          example: 6000
+        weight_at_36_weeks_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at 36 weeks' gestation
+          example: 6200
+        delivery_place:
+          type: string
+          nullable: true
+          description: SNOMED code for actual delivery place
+          example: D0000009
+        delivery_place_other:
+          type: string
+          nullable: true
+          description: Freetext field for actual delivery place
+          example: At home
+        first_medication_taken_recorded:
+          type: string
+          nullable: true
+          description: ISO8601 date for when medication was first taken
+          example: '2020-01-01'
+        first_medication_taken:
+          type: string
+          nullable: true
+          description: Description of when medication was first taken
+          example: 5 days ago
+      description: Pregnancy update request
+    VisitUpdateRequest:
+      type: object
+      properties:
+        visit_date:
+          type: string
+          description: ISO8601 date of visit
+          example: '2020-01-01'
+        location:
+          type: string
+          description: UUID of location where visit occurred
+          example: ccc602d9-eef1-4e48-b012-8312274bcab1
+        summary:
+          type: string
+          nullable: true
+          description: Freetext summary of visit
+          example: Patient was healthy
+        diagnoses:
+          type: array
+          nullable: true
+          description: List of diagnosis UUIDs relevant to the visit
+          example: *id012
+          items:
+            type: string
+        clinician_uuid:
+          type: string
+          description: UUID of clinician with whom visit occurred
+          example: 963410f7-d92e-4b0a-9be1-f141df2a9d35
+      description: Visit update request
+    RecordUpdateRequest:
+      type: object
+      properties:
+        notes:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/NoteUpdateRequest'
+        diagnoses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisUpdateRequest'
+        pregnancies:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/PregnancyUpdateRequest'
+        visits:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitUpdateRequest'
+        history:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/RecordHistoryRequest'
+      description: Record update request
+    DhProductUpdateRequest:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        opened_date:
+          type: string
+          description: Opened date
+          example: '2018-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: Closed date
+          example: '2018-06-01'
+        closed_reason:
+          type: string
+          nullable: true
+          description: Closed reason
+          example: Some reason
+        closed_reason_other:
+          type: string
+          nullable: true
+          description: Closed reason other
+          example: Some other reason
+        accessibility_discussed:
+          type: boolean
+          nullable: true
+          description: Whether accessibility was discussed
+          example: true
+        accessibility_discussed_date:
+          type: string
+          nullable: true
+          description: When was accessibility discussed
+          example: '2019-10-07'
+        accessibility_discussed_with:
+          type: string
+          nullable: true
+          description: UUID of the clinician with whom accessibility was discussed
+          example: 6158fca0-b805-4d4a-9592-654fc1001a94
+      description: Drayson health product update request
+    PatientUpdateRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          description: Patient's first name
+          example: Joan
+        last_name:
+          type: string
+          description: Patient's last name
+          example: Speedwell
+        hospital_number:
+          type: string
+          description: Patient's hospital number (MRN)
+          example: '232434'
+        record:
+          $ref: '#/components/schemas/RecordUpdateRequest'
+        phone_number:
+          type: string
+          nullable: true
+          description: Patient's phone number
+          example: '07777777777'
+        allowed_to_text:
+          type: boolean
+          nullable: true
+          description: Whether SMS messages can be sent to the patient
+          example: true
+        allowed_to_email:
+          type: boolean
+          nullable: true
+          description: Whether emails can be sent to the patient
+          example: true
+        dob:
+          type: string
+          nullable: true
+          description: Patient's date of birth in ISO8601 format
+          example: '1978-05-06'
+        dod:
+          type: string
+          nullable: true
+          description: Patient's date of death in ISO8601 format
+          example: '2020-01-01'
+        nhs_number:
+          type: string
+          nullable: true
+          description: Patient's 10-digit NHS number
+          example: '1111111111'
+        email_address:
+          type: string
+          nullable: true
+          description: Patient's email address
+          example: joan.speedwell@mail.com
+        ethnicity:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's ethnicity
+          example: '186019001'
+        ethnicity_other:
+          type: string
+          nullable: true
+          description: Freetext field for for patient's ethnicity
+          example: Extraterrestrial
+        sex:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's sex
+          example: '248152002'
+        height_in_mm:
+          type: integer
+          nullable: true
+          description: Height (mm)
+          example: 1600
+        weight_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g)
+          example: 6000
+        highest_education_level:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's highest education level
+          example: '224297003'
+        highest_education_level_other:
+          type: string
+          nullable: true
+          description: Freetext field for patient's highest education level
+          example: Arch-chancellor, Unseen University
+        accessibility_considerations:
+          type: array
+          nullable: true
+          description: List of SNOMED code for patient's accessibility considerations
+          example: *id013
+          items:
+            type: string
+        accessibility_considerations_other:
+          type: string
+          nullable: true
+          description: Freetext field for patient's accessibility considerations
+          example: Patient has no ribs
+        other_notes:
+          type: string
+          nullable: true
+          description: Freeteext field for patient notes
+          example: Patient is delightful
+        locations:
+          type: array
+          nullable: true
+          description: UUIDs of locations with which patient is associated
+          example: *id014
+          items:
+            type: string
+        personal_addresses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressRequest'
+        dh_products:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DhProductUpdateRequest'
+        fhir_resource_id:
+          type: string
+          nullable: true
+          description: Patient's ID in a trustomer's FHIR EPR system (null if the
+            patient is not presented there)
+          example: ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+      description: Patient update request
+    NoteResponse:
+      type: object
+      properties:
+        content:
+          type: string
+          description: Contents of the note
+          example: Patient is a delight
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        clinician_uuid:
+          type: string
+          description: Clinician UUID
+          example: 48378ca6-d28b-424a-9408-f8e00b9af657
+      required:
+      - clinician_uuid
+      - content
+      - uuid
+      description: Note response
+    ObservableEntityResponse:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the observable entity
+          example: '443911005'
+        date_observed:
+          type: string
+          description: ISO8601 date for the observable entity
+          example: '2020-01-01'
+        value_as_string:
+          type: string
+          nullable: true
+          description: Observable entity value
+          example: '11'
+        metadata:
+          type: object
+          nullable: true
+          description: Metadata related to the observable entity
+          example:
+            0hr: 50
+            1hr: 100
+            2hr: 75
+            3hr: null
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - date_observed
+      - metadata
+      - sct_code
+      - uuid
+      - value_as_string
+      description: Observable entity response
+    NonMedicationActionResponse:
+      type: object
+      properties:
+        action_sct_code:
+          type: string
+          description: SNOMED code for the action
+          example: '281090004'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - action_sct_code
+      - uuid
+      description: Non medication action
+    DoseChange:
+      type: object
+      properties:
+        medication_id:
+          type: string
+          description: UUID of the medication
+          example: bbc1a393-818f-417a-a6e5-76f9338a6a1c
+        dose_amount:
+          type: number
+          description: Amount of the medication
+          example: 1.5
+        routine_sct_code:
+          type: string
+          nullable: true
+          description: SNOMED code for the dose
+          example: '12345'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - dose_amount
+      - medication_id
+      - uuid
+      description: Dose change
+    DoseResponse:
+      type: object
+      properties:
+        medication_id:
+          type: string
+          description: UUID of the medication
+          example: bbc1a393-818f-417a-a6e5-76f9338a6a1c
+        dose_amount:
+          type: number
+          description: Amount of the medication
+          example: 1.5
+        routine_sct_code:
+          type: string
+          nullable: true
+          description: SNOMED code for the dose
+          example: '12345'
+        changes:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseChange'
+      required:
+      - dose_amount
+      - medication_id
+      description: Dose response
+    DoseHistory:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        clinician_uuid:
+          type: string
+          nullable: true
+          description: Clinician UUID
+          example: 48378ca6-d28b-424a-9408-f8e00b9af657
+        dose:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/DoseResponse'
+        action:
+          type: string
+          nullable: true
+          description: Description of the change
+          example: Reduction by 2 units
+      required:
+      - uuid
+      description: Dose history
+    ManagementPlanResponse:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the management plan type
+          example: '386359008'
+        start_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan started
+          example: '2020-01-01'
+        end_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan ended
+          example: '2020-05-01'
+        actions:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/NonMedicationActionResponse'
+        doses:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseResponse'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        plan_history:
+          type: array
+          nullable: true
+          description: SNOMED codes for previous management plan types
+          example:
+          - '67866001'
+          items:
+            type: string
+        dose_history:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseHistory'
+      required:
+      - sct_code
+      - uuid
+      description: Management plan response
+    ReadingsPlanChange:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        days_per_week_to_take_readings:
+          type: integer
+          nullable: true
+          description: Days per week patient is expected to take readings
+          example: 5
+        readings_per_day:
+          type: integer
+          nullable: true
+          description: Number of readings per day patient is expected to take
+          example: 4
+      required:
+      - uuid
+      description: Readings plan change
+    ReadingsPlanResponse:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the readings plan type
+          example: '33747003'
+        start_date:
+          type: string
+          description: ISO8601 date when plan started
+          example: '2020-01-01'
+        days_per_week_to_take_readings:
+          type: integer
+          description: Days per week patient is expected to take readings
+          example: 5
+        readings_per_day:
+          type: integer
+          description: Number of readings per day patient is expected to take
+          example: 4
+        end_date:
+          type: string
+          nullable: true
+          description: ISO8601 date when plan ended
+          example: '2020-05-01'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadingsPlanChange'
+      required:
+      - changes
+      - days_per_week_to_take_readings
+      - readings_per_day
+      - sct_code
+      - start_date
+      - uuid
+      description: Readings plan response
+    DiagnosisResponse:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the diagnosis
+          example: '11687002'
+        diagnosis_other:
+          type: string
+          nullable: true
+          description: Freetext field for diagnosis description
+          example: Diabetes type 4
+        diagnosed:
+          type: string
+          nullable: true
+          description: ISO8601 date of diagnosis
+          example: '2020-01-01'
+        resolved:
+          type: string
+          nullable: true
+          description: ISO8601 date of resolution
+          example: '2020-01-01'
+        episode:
+          type: integer
+          nullable: true
+          example: 1
+        presented:
+          type: string
+          nullable: true
+          description: ISO8601 date of presentation
+          example: '2020-01-01'
+        diagnosis_tool:
+          type: array
+          nullable: true
+          description: List of SNOMED code for the diagnosis tools
+          example: *id008
+          items:
+            type: string
+        diagnosis_tool_other:
+          type: string
+          nullable: true
+          description: Freetext field for the diagnosis tool
+          example: My own intuition
+        risk_factors:
+          type: array
+          nullable: true
+          description: List of SNOMED code for risk factors
+          example: *id009
+          items:
+            type: string
+        observable_entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObservableEntityResponse'
+        management_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ManagementPlanResponse'
+        readings_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ReadingsPlanResponse'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - observable_entities
+      - sct_code
+      - uuid
+      description: Diagnosis response
+    BabyResponse:
+      type: object
+      properties:
+        sex:
+          type: string
+          nullable: true
+          description: SNOMED code for baby's sex
+          example: '248152002'
+        first_name:
+          type: string
+          nullable: true
+          description: Baby's first name
+          example: Joan
+        last_name:
+          type: string
+          nullable: true
+          description: Baby's last name
+          example: Speedwell
+        dob:
+          type: string
+          nullable: true
+          description: Baby's date of birth in ISO8601 format
+          example: '1978-05-06'
+        phone_number:
+          type: string
+          nullable: true
+          description: Baby's phone number
+          example: '07777777777'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - uuid
+      description: Baby
+    DeliveryResponse:
+      type: object
+      properties:
+        birth_outcome:
+          type: string
+          nullable: true
+          description: SNOMED code for birth outcome
+          example: '48782003'
+        outcome_for_baby:
+          type: string
+          nullable: true
+          description: SNOMED code for outcome for baby
+          example: '169826009'
+        neonatal_complications:
+          type: array
+          nullable: true
+          description: List of SNOMED codes for neonatal complications
+          example: *id010
+          items:
+            type: string
+        neonatal_complications_other:
+          type: string
+          nullable: true
+          description: Freetext field for other neonatal complications
+          example: Baby is too cute
+        admitted_to_special_baby_care_unit:
+          type: boolean
+          nullable: true
+          description: Whether the patient was admitted to special baby care unit
+          example: false
+        birth_weight_in_grams:
+          type: integer
+          nullable: true
+          description: Birth weight (g)
+          example: 2000
+        length_of_postnatal_stay_for_baby:
+          type: integer
+          nullable: true
+          description: Length of postnatal stay for baby in days
+          example: 3
+        apgar_1_minute:
+          type: integer
+          nullable: true
+          description: APGAR score 1 minute after birth
+          example: 9
+        apgar_5_minute:
+          type: integer
+          nullable: true
+          description: APGAR score 5 minutes after birth
+          example: 10
+        feeding_method:
+          type: string
+          nullable: true
+          description: SNOMED code for feeding method
+          example: '226789007'
+        date_of_termination:
+          type: string
+          nullable: true
+          description: ISO8601 date of termination
+          example: '2020-01-01'
+        patient:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/BabyResponse'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - uuid
+      description: Delivery response
+    PregnancyResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        estimated_delivery_date:
+          type: string
+          description: ISO8601 date of expected delivery
+          example: '2020-01-01'
+        planned_delivery_place:
+          type: string
+          nullable: true
+          description: SNOMED code for planned delivery place
+          example: '310586008'
+        length_of_postnatal_stay_in_days:
+          type: integer
+          nullable: true
+          description: Length of postnatal stay in days
+          example: 3
+        colostrum_harvesting:
+          type: boolean
+          nullable: true
+          description: Whether colostrum harvesting occurred
+          example: true
+        expected_number_of_babies:
+          type: integer
+          nullable: true
+          description: Expected number of babies
+          example: 1
+        pregnancy_complications:
+          type: array
+          nullable: true
+          description: List of SNOMED codes for any pregnancy complications
+          example: *id011
+          items:
+            type: string
+        induced:
+          type: boolean
+          nullable: true
+          description: Whether pregnancy was induced
+          example: false
+        deliveries:
+          nullable: true
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryResponse'
+        height_at_booking_in_mm:
+          type: integer
+          nullable: true
+          description: Height (mm) at booking
+          example: 1600
+        weight_at_diagnosis_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at diagnosis
+          example: 6000
+        weight_at_booking_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at booking
+          example: 6000
+        weight_at_36_weeks_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g) at 36 weeks' gestation
+          example: 6200
+        delivery_place:
+          type: string
+          nullable: true
+          description: SNOMED code for actual delivery place
+          example: D0000009
+        delivery_place_other:
+          type: string
+          nullable: true
+          description: Freetext field for actual delivery place
+          example: At home
+        first_medication_taken_recorded:
+          type: string
+          nullable: true
+          description: ISO8601 date for when medication was first taken
+          example: '2020-01-01'
+        first_medication_taken:
+          type: string
+          nullable: true
+          description: Description of when medication was first taken
+          example: 5 days ago
+      required:
+      - estimated_delivery_date
+      - uuid
+      description: Pregnancy response
+    VisitResponse:
+      type: object
+      properties:
+        visit_date:
+          type: string
+          description: ISO8601 date of visit
+          example: '2020-01-01'
+        location:
+          type: string
+          description: UUID of location where visit occurred
+          example: ccc602d9-eef1-4e48-b012-8312274bcab1
+        summary:
+          type: string
+          nullable: true
+          description: Freetext summary of visit
+          example: Patient was healthy
+        diagnoses:
+          type: array
+          nullable: true
+          description: List of diagnosis UUIDs relevant to the visit
+          example: *id012
+          items:
+            type: string
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        clinician_uuid:
+          type: string
+          description: UUID of clinician with whom visit occurred
+          example: 963410f7-d92e-4b0a-9be1-f141df2a9d35
+      required:
+      - clinician_uuid
+      - location
+      - uuid
+      - visit_date
+      description: Visit response
+    RecordHistoryResponse:
+      type: object
+      properties:
+        parity:
+          type: integer
+          nullable: true
+          description: Gestational parity (number of pregnancies carried beyond 20
+            weeks)
+          example: 2
+        gravidity:
+          type: integer
+          nullable: true
+          description: Gestational gravidity (number of pregnancies)
+          example: 2
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - uuid
+      description: Record history response
+    RecordResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NoteResponse'
+        diagnoses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisResponse'
+        pregnancies:
+          type: array
+          items:
+            $ref: '#/components/schemas/PregnancyResponse'
+        visits:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitResponse'
+        history:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/RecordHistoryResponse'
+      required:
+      - diagnoses
+      - history
+      - notes
+      - pregnancies
+      - uuid
+      - visits
+      description: Record response
+    AddressResponse:
+      type: object
+      properties:
+        address_line_1:
+          type: string
+          nullable: true
+          description: First line of address
+          example: Flat 14
+        address_line_2:
+          type: string
+          nullable: true
+          description: Second line of address
+          example: 11 Spring Close
+        address_line_3:
+          type: string
+          nullable: true
+          description: Third line of address
+          example: Summerville
+        address_line_4:
+          type: string
+          nullable: true
+          description: Fourth line of address
+          example: Autumn City
+        locality:
+          type: string
+          nullable: true
+          description: Locality of address
+          example: Wintershire
+        region:
+          type: string
+          nullable: true
+          description: Region of address
+          example: England
+        postcode:
+          type: string
+          nullable: true
+          description: Postcode of address
+          example: A11 111
+        country:
+          type: string
+          nullable: true
+          description: Country of address
+          example: United Kingdom
+        lived_from:
+          type: string
+          nullable: true
+          description: ISO8601 date for start of residence
+          example: '2017-09-01'
+        lived_until:
+          type: string
+          nullable: true
+          description: ISO8601 date for end of residence
+          example: '2019-03-23'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - uuid
+      description: Address response
+    DhProductChangeResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        event:
+          type: string
+          description: Event resulting in a change
+          example: archive
+      required:
+      - event
+      - uuid
+      description: Product change
+    DhProductResponse:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        opened_date:
+          type: string
+          description: Opened date
+          example: '2018-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: Closed date
+          example: '2018-06-01'
+        closed_reason:
+          type: string
+          nullable: true
+          description: Closed reason
+          example: Some reason
+        closed_reason_other:
+          type: string
+          nullable: true
+          description: Closed reason other
+          example: Some other reason
+        accessibility_discussed:
+          type: boolean
+          nullable: true
+          description: Whether accessibility was discussed
+          example: true
+        accessibility_discussed_date:
+          type: string
+          nullable: true
+          description: When was accessibility discussed
+          example: '2019-10-07'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        accessibility_discussed_with:
+          type: string
+          nullable: true
+        monitored_by_clinician:
+          type: boolean
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DhProductChangeResponse'
+      required:
+      - monitored_by_clinician
+      - opened_date
+      - product_name
+      - uuid
+      description: Drayson health product response
+    PatientTermsResponse:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product whose terms have been agreed to
+          example: GDM
+        version:
+          type: integer
+          description: Version number of terms agreed to
+          example: 3
+        accepted_timestamp:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+      required:
+      - product_name
+      - uuid
+      - version
+      description: Patient terms agreement response
+    PatientResponse:
+      type: object
+      properties:
+        first_name:
+          type: string
+          nullable: true
+          description: Patient's first name
+          example: Joan
+        last_name:
+          type: string
+          nullable: true
+          description: Patient's last name
+          example: Speedwell
+        hospital_number:
+          type: string
+          nullable: true
+          description: Patient's hospital number (MRN)
+          example: '232434'
+        record:
+          $ref: '#/components/schemas/RecordResponse'
+        phone_number:
+          type: string
+          nullable: true
+          description: Patient's phone number
+          example: '07777777777'
+        allowed_to_text:
+          type: boolean
+          nullable: true
+          description: Whether SMS messages can be sent to the patient
+          example: true
+        allowed_to_email:
+          type: boolean
+          nullable: true
+          description: Whether emails can be sent to the patient
+          example: true
+        dob:
+          type: string
+          nullable: true
+          description: Patient's date of birth in ISO8601 format
+          example: '1978-05-06'
+        dod:
+          type: string
+          nullable: true
+          description: Patient's date of death in ISO8601 format
+          example: '2020-01-01'
+        nhs_number:
+          type: string
+          nullable: true
+          description: Patient's 10-digit NHS number
+          example: '1111111111'
+        email_address:
+          type: string
+          nullable: true
+          description: Patient's email address
+          example: joan.speedwell@mail.com
+        ethnicity:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's ethnicity
+          example: '186019001'
+        ethnicity_other:
+          type: string
+          nullable: true
+          description: Freetext field for for patient's ethnicity
+          example: Extraterrestrial
+        sex:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's sex
+          example: '248152002'
+        height_in_mm:
+          type: integer
+          nullable: true
+          description: Height (mm)
+          example: 1600
+        weight_in_g:
+          type: integer
+          nullable: true
+          description: Weight (g)
+          example: 6000
+        highest_education_level:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's highest education level
+          example: '224297003'
+        highest_education_level_other:
+          type: string
+          nullable: true
+          description: Freetext field for patient's highest education level
+          example: Arch-chancellor, Unseen University
+        accessibility_considerations:
+          type: array
+          nullable: true
+          description: List of SNOMED code for patient's accessibility considerations
+          example: *id013
+          items:
+            type: string
+        accessibility_considerations_other:
+          type: string
+          nullable: true
+          description: Freetext field for patient's accessibility considerations
+          example: Patient has no ribs
+        other_notes:
+          type: string
+          nullable: true
+          description: Freeteext field for patient notes
+          example: Patient is delightful
+        locations:
+          type: array
+          nullable: true
+          description: UUIDs of locations with which patient is associated
+          example: *id014
+          items:
+            type: string
+        personal_addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressResponse'
+        dh_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/DhProductResponse'
+        fhir_resource_id:
+          type: string
+          nullable: true
+          description: Patient's ID in a trustomer's FHIR EPR system (null if the
+            patient is not presented there)
+          example: ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        terms_agreement:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/PatientTermsResponse'
+        bookmarked:
+          type: boolean
+          nullable: true
+          description: Whether patient is bookmarked
+          example: false
+        has_been_bookmarked:
+          type: boolean
+          nullable: true
+          description: Whether patient has ever been bookmarked
+          example: true
+        clinician_bookmark:
+          type: boolean
+          nullable: true
+          description: Whether patient is bookmarked by a clinician
+          example: true
+      required:
+      - dh_products
+      - first_name
+      - hospital_number
+      - last_name
+      - personal_addresses
+      - record
+      - uuid
+      description: Patient response
+    AbbreviatedManagementPlanResponse:
+      type: object
+      properties:
+        doses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DoseResponse'
+      required:
+      - doses
+      description: Abbreviated Management plan response
+    AbbreviatedDiagnosisResponse:
+      type: object
+      properties:
+        management_plan:
+          $ref: '#/components/schemas/AbbreviatedManagementPlanResponse'
+      required:
+      - management_plan
+      description: Abbreviated Diagnosis response
+    AbbreviatedRecordResponse:
+      type: object
+      properties:
+        diagnoses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AbbreviatedDiagnosisResponse'
+      required:
+      - diagnoses
+      description: Abbreviated Record response
+    AbbreviatedPatientResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        locations:
+          type: array
+          description: UUIDs of locations with which patient is associated
+          example:
+          - ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+          items:
+            type: string
+        record:
+          description: Abbreviated patient record
+          allOf:
+          - $ref: '#/components/schemas/AbbreviatedRecordResponse'
+      required:
+      - locations
+      - record
+      - uuid
+      description: Abbreviated patient response
+    ClosePatientRequest:
+      type: object
+      properties:
+        closed_date:
+          type: string
+          description: ISO8601 date for when patient was closed
+          example: '2017-09-01'
+        closed_reason:
+          type: string
+          nullable: true
+          description: SNOMED code for reason for closing patient
+          example: '289256000'
+        closed_reason_other:
+          type: string
+          nullable: true
+          description: Freetext field for reason for closing patient
+          example: Patient created in error
+      required:
+      - closed_date
+      description: Close patient request
+    SimpleReadingsPlan:
+      type: object
+      properties:
+        created:
+          type: string
+          description: ISO8601 timestamp of acceptance
+          example: '2020-01-01T00:00:00.000Z'
+        days_per_week_to_take_readings:
+          type: integer
+          description: Days per week patient is expected to take readings
+          example: 5
+        readings_per_day:
+          type: integer
+          description: Number of readings per day patient is expected to take
+          example: 4
+      required:
+      - created
+      - days_per_week_to_take_readings
+      - readings_per_day
+      description: Simple readings plan
+    ActivityAlertingPatientResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        first_name:
+          type: string
+          description: Patient's first name
+          example: Joan
+        locations:
+          type: array
+          description: UUIDs of locations with which patient is associated
+          example:
+          - ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+          items:
+            type: string
+        readings_plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleReadingsPlan'
+      required:
+      - first_name
+      - locations
+      - readings_plans
+      - uuid
+      description: Activity alerting patient response
+    ValidatePatientRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          nullable: true
+          description: Patient's first name
+          example: Joan
+        last_name:
+          type: string
+          nullable: true
+          description: Patient's last name
+          example: Speedwell
+        hospital_number:
+          type: string
+          nullable: true
+          description: Patient's hospital number (MRN)
+          example: '232434'
+        dob:
+          type: string
+          nullable: true
+          description: Patient's date of birth in ISO8601 format
+          example: '1978-05-06'
+      description: Validate patient request
+    FirstMedicationRequest:
+      type: object
+      properties:
+        first_medication_taken:
+          type: string
+          description: Patient's description of when the first medication was taken
+          example: 3 days ago
+        first_medication_taken_recorded:
+          type: string
+          description: ISO8601 date for the time at which the patient reported having
+            first taken medication
+          example: '2020-01-01'
+      required:
+      - first_medication_taken
+      - first_medication_taken_recorded
+      description: First medication request
+    DiabetesDiagnosisResponse:
+      type: object
+      properties:
+        sct_code:
+          type: string
+          description: SNOMED code for the diagnosis
+          example: '11687002'
+        diagnosis_other:
+          type: string
+          nullable: true
+          description: Freetext field for diagnosis description
+          example: Diabetes type 4
+        readings_plan:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ReadingsPlanResponse'
+      required:
+      - readings_plan
+      - sct_code
+      description: Diagnosis request
+    DiabetesRecordResponse:
+      type: object
+      properties:
+        diagnoses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiabetesDiagnosisResponse'
+      required:
+      - diagnoses
+      description: Diabetes Record response
+    DhDiabetesProductResponse:
+      type: object
+      properties:
+        product_name:
+          type: string
+          description: Product name
+          example: SEND
+        opened_date:
+          type: string
+          description: Opened date
+          example: '2018-01-01'
+        closed_date:
+          type: string
+          nullable: true
+          description: Closed date
+          example: '2018-06-01'
+        closed_reason:
+          type: string
+          nullable: true
+          description: Closed reason
+          example: Some reason
+        closed_reason_other:
+          type: string
+          nullable: true
+          description: Closed reason other
+          example: Some other reason
+        accessibility_discussed:
+          type: boolean
+          nullable: true
+          description: Whether accessibility was discussed
+          example: true
+        accessibility_discussed_date:
+          type: string
+          nullable: true
+          description: When was accessibility discussed
+          example: '2019-10-07'
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        monitored_by_clinician:
+          type: boolean
+      required:
+      - monitored_by_clinician
+      - opened_date
+      - product_name
+      - uuid
+      description: Drayson health product response
+    PatientDiabetesResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Universally unique identifier for object
+          example: 2c4f1d24-2952-4d4e-b1d1-3637e33cc161
+        created:
+          type: string
+          description: When the object was created
+          example: '2017-09-23T08:29:19.123+00:00'
+        created_by:
+          type: string
+          description: UUID of the user that created the object
+          example: d26570d8-a2c9-4906-9c6a-ea1a98b8b80f
+        modified:
+          type: string
+          description: When the object was modified
+          example: '2017-09-23T08:29:19.123+00:00'
+        modified_by:
+          type: string
+          description: UUID of the user that modified the object
+          example: 2a0e26e5-21b6-463a-92e8-06d7290067d0
+        first_name:
+          type: string
+          nullable: true
+          description: Patient's first name
+          example: Joan
+        last_name:
+          type: string
+          nullable: true
+          description: Patient's last name
+          example: Speedwell
+        hospital_number:
+          type: string
+          description: Patient's hospital number (MRN)
+          example: '232434'
+        record:
+          $ref: '#/components/schemas/DiabetesRecordResponse'
+        dh_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/DhDiabetesProductResponse'
+        dob:
+          type: string
+          nullable: true
+          description: Patient's date of birth in ISO8601 format
+          example: '1978-05-06'
+        dod:
+          type: string
+          nullable: true
+          description: Patient's date of death in ISO8601 format
+          example: '2020-01-01'
+        nhs_number:
+          type: string
+          nullable: true
+          description: Patient's 10-digit NHS number
+          example: '1111111111'
+        sex:
+          type: string
+          nullable: true
+          description: SNOMED code for patient's sex
+          example: '248152002'
+        locations:
+          type: array
+          nullable: true
+          description: UUIDs of locations with which patient is associated
+          example:
+          - ea9fd397-6ff6-4b29-a4d2-c9d36bfa2737
+          items:
+            type: string
+      required:
+      - dh_products
+      - first_name
+      - hospital_number
+      - last_name
+      - record
+      - uuid
+      description: Patient diabetes request
+    ActiveWeeklyPatientCountResponse:
+      type: object
+      properties:
+        year_week:
+          type: string
+          nullable: true
+          description: The year and week that the data covers
+          example: 2021-1
+        count:
+          type: integer
+          nullable: true
+          description: Count of active patients
+          example: 100
+      required:
+      - count
+      - year_week
+      description: Active patient counts by week
+    DailyCreatedPatientCountsResponse:
+      type: object
+      properties:
+        date:
+          type: string
+          nullable: true
+          description: The day data covers
+          example: '2021-01-25'
+        count:
+          type: integer
+          nullable: true
+          description: Count of daily created patients
+          example: 100
+      required:
+      - count
+      - date
+      description: Daily created patient counts
+  responses:
+    BadRequest:
+      description: Bad or malformed request was received
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServiceUnavailable:
+      description: Service or dependent resource not available
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,0 +1,19 @@
+{
+  "data": {
+    "record": {
+      "pregnancies": [
+        {
+          "induced": false,
+          "uuid": "pregnancy_uuid"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/uuid",
+      "value_format": "{context.pregnancy_uuid}"
+    }
+  ]
+}

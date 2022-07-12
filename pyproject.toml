@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "she-dhos-services-api"
+version = "0.0.1"
+description = "DHOS Services API"
+authors = ["Rob Grant <rob.grant@sensynehealth.com>"]
+keywords = ["Swagger", "Services", "Patients", "Locations", "Users", "Clinicians"]
+repository = "https://github.com/draysontechnologies/dhos-services-api"
+
+[[tool.poetry.source]]
+name = "sensynehealth"
+url = "https://pypi.fury.io/sensynehealth/"
+
+[tool.poetry.dependencies]
+python = "^3.9,<3.10"
+auth0-api-client = "1.*"
+click = "8.0.*" # https://github.com/dask/distributed/issues/6013
+draymed = "2.*"
+flask-batteries-included = {version = "3.*", extras = ["apispec", "pgsql"]}
+kombu-batteries-included = "1.*"
+jsonpath-ng = "1.*"
+jsonschema = "3.*"
+lazy-import = "0.*"
+pycryptodomex = "3.*"
+she-logging = "1.*"
+neomodel="3.*"
+python-jose = "3.*"
+tenacity = "^7.0.0"
+SQLAlchemy = {extras = ["mypy"], version = "^1.4.36"}
+pydantic = "^1.9.1"
+pytest-alembic = "^0.8.2"
+
+[tool.poetry.dev-dependencies]
+bandit = "*"
+black = "*"
+coloredlogs = "*"
+coverage = "*"
+isort = "*"
+mock = "*"
+mypy = "*"
+pytest = "*"
+pytest-dhos = {version = "*", extras=["fbi", "neo"]}
+python-dotenv = "*"
+pytest-flask = "*"
+pytest-freezegun = "*"
+pytest-mock = "*"
+requests_mock = "1.8.*"
+sadisplay = "*"
+safety = "*"
+tox = "*"
+tox-docker = "*"
+Faker = "*"
+types-waitress = "^0.1.9"
+types-requests = "^2.25.6"
+types-PyYAML = "^5.4.7"

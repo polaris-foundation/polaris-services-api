@@ -1,0 +1,32 @@
+{
+  "data": {
+    "record": {
+      "diagnoses": [
+        {
+          "management_plan": {
+            "doses": [
+              {
+                "dose_amount": 3.5,
+                "uuid": "{dose_id}"
+              }
+            ],
+            "sct_code": "55555"
+          },
+          "uuid": "{diagnosis_id}"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/diagnoses/0/uuid",
+      "value_format": "{context.diagnosis_uuid}"
+    },
+    {
+      "op": "replace",
+      "path": "/record/diagnoses/0/management_plan/doses/0/uuid",
+      "value_format": "{context.dose_uuid}"
+    }
+  ]
+}

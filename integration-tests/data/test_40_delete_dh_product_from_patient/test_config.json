@@ -1,0 +1,12 @@
+{
+    "description": "Delete DH product.",
+	"url": "dhos/v1/patient/{patient_id}",
+	"method": "DELETE",
+	"swagger_operation_id": "deletePatient",
+	"input_json_file": "input_40.json",
+	"output_json_file": "output_40.json",
+	"hooks": {
+		"before_test": "before_test_40",
+		"after_test": "after_test_40"
+	}
+}

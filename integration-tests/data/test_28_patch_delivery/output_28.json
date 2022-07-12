@@ -1,0 +1,31 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/pregnancies/0/deliveries/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/pregnancies/0/deliveries/0/patient"
+  },
+  {
+    "op": "test",
+    "path": "/record/pregnancies/0/deliveries",
+    "value": [
+      {
+        "admitted_to_special_baby_care_unit": false,
+        "apgar_1_minute": 121,
+        "apgar_5_minute": 321,
+        "birth_outcome": "123456",
+        "birth_weight_in_grams": 1777,
+        "date_of_termination": null,
+        "feeding_method": "132",
+        "length_of_postnatal_stay_for_baby": 1,
+        "neonatal_complications": [
+          "123456"
+        ],
+        "neonatal_complications_other": "1111999",
+        "outcome_for_baby": "987654"
+      }
+    ]
+  }
+]

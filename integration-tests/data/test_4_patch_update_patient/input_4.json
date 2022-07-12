@@ -1,0 +1,8 @@
+{
+  "data": {"locations": []},
+  "patches": [
+    {
+      "op": "add", "path": "/locations/-", "value_format": "{context.alternate_location_uuid}"
+    }
+  ]
+}

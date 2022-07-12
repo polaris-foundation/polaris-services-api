@@ -1,0 +1,186 @@
+x-healthcheck:
+  &FLASK_HEALTHCHECK
+  healthcheck:
+    test: curl -f http://localhost:5000/running || false
+    interval: 3s
+    retries: 40
+    start_period: 10s
+
+x-environment:
+  &COMMON_ENVIRONMENT
+  ENVIRONMENT: DEVELOPMENT
+  ALLOW_DROP_DATA: "True"
+  PROXY_URL: http://localhost
+  HS_ISSUER: http://localhost/
+  HS_KEY: secret
+  AUTH0_MGMT_CLIENT_ID: "doesnotmatter"
+  AUTH0_MGMT_CLIENT_SECRET: "shhh"
+  AUTH0_AUTHZ_CLIENT_ID: "doesnotmatter"
+  AUTH0_AUTHZ_CLIENT_SECRET: "shhh"
+  AUTH0_AUTHZ_WEBTASK_URL: "doesnotmatter"
+  AUTH0_CLIENT_ID: "doesnotmatter"
+  AUTH0_AUDIENCE: "http://localhost/"
+  NONCUSTOM_AUTH0_DOMAIN: "https://integration-tests"
+  AUTH0_CUSTOM_DOMAIN: "dev"
+  DISABLE_CREATE_USER_IN_AUTH0: "True"
+  AUTH0_HS_KEY: "secret"
+  NEO4J_DB_URL: neo4j
+  NEO4J_DB_PORT: 7687
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_USERNAME: guest
+  RABBITMQ_PASSWORD: guest
+  REDIS_HOST: localhost
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: any
+  SMTP_HOST: dummy
+  SMTP_AUTH_PASS: dummy
+  SMTP_AUTH_USER: dummy
+  EMAIL_SENDER: dummy
+  TOKEN_URL: "https://integration-tests/oauth/token"
+  CUSTOMER_CODE: DEV
+  LOG_LEVEL: DEBUG
+  LOG_FORMAT: COLOUR
+  DHOS_LOCATIONS_API_HOST: http://dhos-locations-api:5000
+  DHOS_USERS_API_HOST: http://dhos-users-api:5000
+
+services:
+  dhos-services-api:
+    container_name: "dhos-services-api"
+    build:
+      context: ..
+      args:
+        - GEMFURY_DOWNLOAD_KEY
+    environment:
+      <<: *COMMON_ENVIRONMENT
+      EXTERNAL_URL: http://dhos-services-api:5000
+      DATABASE_HOST: postgres-db
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres-user
+      DATABASE_PASSWORD: postgres-password
+      DATABASE_NAME: dhos-services-api
+    user: root
+    <<: *FLASK_HEALTHCHECK
+    command: >
+      bash -c "apt-get update && apt-get install openssh-server -y
+      && (echo 'app:app' | chpasswd)
+      && service ssh start
+      && env > /app/local.env
+      && su app -- -c 'flask db upgrade && python -m dhos_services_api'"
+    depends_on:
+      "neo4j":
+        condition: service_healthy
+      "rabbitmq":
+        condition: service_healthy
+      "dhos-locations-api":
+        condition: service_healthy
+      "dhos-users-api":
+        condition: service_healthy
+
+  neo4j:
+    container_name: "neo4j"
+    image: neo4j:3.5
+    environment:
+      - NEO4J_AUTH=none
+    healthcheck:
+      test: ["CMD", "cypher-shell", "match (n) return count(n)"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  rabbitmq:
+    container_name: "rabbitmq"
+    image: docker.io/rabbitmq:3.8-management-alpine
+    healthcheck:
+      test: rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  dhos-services-integration-tests:
+    container_name: "dhos-services-integration-tests"
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      args:
+        - PIP_EXTRA_INDEX_URL
+    environment:
+      <<: *COMMON_ENVIRONMENT
+      SYSTEM_JWT_SCOPE: >-
+        delete:gdm_article delete:gdm_sms read:audit_event read:gdm_activation read:gdm_answer_all read:gdm_bg_reading_all
+        read:gdm_clinician_all read:gdm_location_all read:gdm_medication read:gdm_message_all read:gdm_patient_all
+        read:gdm_pdf read:gdm_question read:gdm_rule read:gdm_sms read:gdm_survey_all read:gdm_telemetry
+        read:gdm_telemetry_all read:gdm_trustomer read:location_by_ods read:send_clinician read:send_device
+        read:send_encounter read:send_entry_identifier read:send_location read:send_observation read:send_patient
+        read:send_pdf read:send_rule read:send_trustomer write:audit_event write:gdm_activation write:gdm_alert
+        write:gdm_article write:gdm_clinician_all write:gdm_csv write:gdm_location write:gdm_medication
+        write:gdm_message_all write:gdm_patient_all write:patient_all write:gdm_pdf write:gdm_question write:gdm_sms write:gdm_survey
+        write:gdm_telemetry write:hl7_message write:send_clinician write:send_clinician_all write:send_device
+        write:send_encounter write:send_location write:send_observation write:send_patient write:send_pdf
+      BEHAVE_ARGS: ${BEHAVE_ARGS:-}
+      REPORT_PORTAL_URL: ${REPORT_PORTAL_URL:-}
+      REPORT_PORTAL_TOKEN: ${REPORT_PORTAL_TOKEN:-}
+      REPORT_PORTAL_PROJECT: ${REPORT_PORTAL_PROJECT:-}
+      ENVIRONMENT: ${ENVIRONMENT:-}
+      RELEASE: ${RELEASE:-}
+    command: >
+      bash -c "behave --no-capture --no-logcapture ${BEHAVE_ARGS:-}"
+    depends_on:
+      "dhos-services-api":
+        condition: service_healthy
+      "rabbitmq":
+        condition: service_healthy
+
+  dhos-locations-api:
+    container_name: "dhos-locations-api"
+    image: sensynehealth.azurecr.io/dhos/dhos-locations-api:dev
+    environment:
+      <<: *COMMON_ENVIRONMENT
+      DATABASE_HOST: postgres-db
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres-user
+      DATABASE_PASSWORD: postgres-password
+      DATABASE_NAME: dhos-locations-api
+      EXTERNAL_URL: http://dhos-locations-api:5000
+      ALLOW_DROP_DATA: "True"
+    command: >-
+      bash -c "flask db upgrade && python -m dhos_locations_api"
+    <<: *FLASK_HEALTHCHECK
+    depends_on:
+      "postgres-db":
+        condition: service_healthy
+
+  dhos-users-api:
+    container_name: "dhos-users-api"
+    image: sensynehealth.azurecr.io/dhos/dhos-users-api:dev
+    environment:
+      <<: *COMMON_ENVIRONMENT
+      DATABASE_HOST: postgres-db
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres-user
+      DATABASE_PASSWORD: postgres-password
+      DATABASE_NAME: dhos-users-api
+      ALLOW_DROP_DATA: "True"
+    command: >-
+      bash -c "flask db upgrade && python -m dhos_users_api"
+    <<: *FLASK_HEALTHCHECK
+    depends_on:
+      "postgres-db":
+        condition: service_healthy
+      "rabbitmq":
+        condition: service_healthy
+
+  postgres-db:
+    container_name: "postgres-db"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    build:
+      context: ./postgres-db
+    environment:
+      - POSTGRES_USER=postgres-user
+      - POSTGRES_PASSWORD=postgres-password
+      - POSTGRES_MULTIPLE_DATABASES="dhos-locations-api","dhos-users-api","dhos-services-api"

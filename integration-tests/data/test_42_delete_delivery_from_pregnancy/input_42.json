@@ -1,0 +1,28 @@
+{
+  "data": {
+    "record": {
+      "pregnancies": [
+        {
+          "deliveries": [
+            {
+              "uuid": "{delivery_id}"
+            }
+          ],
+          "uuid": "{pregnancy_id}"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/uuid",
+      "value_format": "{context.pregnancy_uuid}"
+    },
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/deliveries/0/uuid",
+      "value_format": "{context.delivery_uuid}"
+    }
+  ]
+}

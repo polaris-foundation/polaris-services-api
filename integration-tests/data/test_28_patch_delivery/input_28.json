@@ -1,0 +1,29 @@
+{
+  "data": {
+    "record": {
+      "pregnancies": [
+        {
+          "deliveries": [
+            {
+              "birth_weight_in_grams": 1777,
+              "uuid": "delivery_uuid"
+            }
+          ],
+          "uuid": "pregnancy_uuid"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/uuid",
+      "value_format": "{context.pregnancy_uuid}"
+    },
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/deliveries/0/uuid",
+      "value_format": "{context.delivery_uuid}"
+    }
+  ]
+}

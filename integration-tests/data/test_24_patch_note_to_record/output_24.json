@@ -1,0 +1,25 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/notes/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/notes/0/clinician/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/record/notes",
+    "value": [
+      {
+        "clinician": {
+          "email_address": "sam@nhs.com",
+          "first_name": "Sam",
+          "job_title": "winner",
+          "last_name": "Tarly"
+        },
+        "content": "Will need to monitor patient closely"
+      }
+    ]
+  }
+]

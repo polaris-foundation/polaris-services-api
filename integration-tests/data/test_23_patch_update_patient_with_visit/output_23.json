@@ -1,0 +1,34 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/visits/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/visits/0/clinician/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/record/visits/0/location",
+    "value_format": "{context.location_uuid}"
+  },
+  {
+    "op": "remove",
+    "path": "/record/visits/0/location"
+  },
+  {
+    "op": "test",
+    "path": "/record/visits",
+    "value": [
+      {
+        "clinician": {
+          "first_name": "Sam",
+          "last_name": "Tarly"
+        },
+        "diagnoses": [],
+        "summary": "a summary of the visit",
+        "visit_date": "2018-04-11T14:52:06.643Z"
+      }
+    ]
+  }
+]

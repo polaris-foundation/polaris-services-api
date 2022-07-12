@@ -1,0 +1,18 @@
+[
+  {"op": "test", "path": "/allowed_to_email", "value": null},
+  {"op": "test", "path": "/allowed_to_text", "value": true},
+  {"op": "test", "path": "/first_name", "value": "Dorothy"},
+  {"op": "test", "path": "/last_name", "value": "Doe"},
+  {"op": "test", "path": "/dh_products/0/accessibility_discussed_date", "value_format": "{context.accessibility_discussed_date}"},
+  {"op": "test", "path": "/dh_products/0/product_name", "value": "GDM"},
+  {"op": "test", "path": "/highest_education_level", "value": "426769009"},
+  {"op": "test", "path": "/hospital_number", "value": "a1b2c3d4e5f6"},
+  {"op": "test", "path": "/personal_addresses/0/address_line_1", "value": "42 Some Street"},
+  {"op": "test", "path": "/record/diagnoses/0/diagnosis_tool", "value": ["1234567890"]},
+  {"op": "test", "path": "/record/diagnoses/0/management_plan/actions/0/action_sct_code", "value": "12345"},
+  {"op": "test", "path": "/record/diagnoses/0/management_plan/dose_history/0/action", "value": "insert"},
+  {"op": "test", "path": "/record/diagnoses/0/management_plan/doses/0/dose_amount", "value": 1.5},
+  {"op": "test", "path": "/record/diagnoses/0/observable_entities/0/value_as_string", "value": "A value"},
+  {"op": "test", "path": "/record/diagnoses/0/readings_plan/changes/0/readings_per_day", "value": 4},
+  {"op": "test", "path": "/record/pregnancies/0/deliveries/0/birth_weight_in_grams", "value": 1000}
+]

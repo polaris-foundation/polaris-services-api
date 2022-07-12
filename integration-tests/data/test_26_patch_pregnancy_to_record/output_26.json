@@ -1,0 +1,38 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/pregnancies/0/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/record/pregnancies/0/estimated_delivery_date",
+    "value_format": "{context.estimated_delivery_date}"
+  },
+  {
+    "op": "remove",
+    "path": "/record/pregnancies/0/estimated_delivery_date"
+  },
+  {
+    "op": "test",
+    "path": "/record/pregnancies",
+    "value": [
+      {
+        "colostrum_harvesting": true,
+        "deliveries": [],
+        "delivery_place": null,
+        "delivery_place_other": null,
+        "expected_number_of_babies": 1,
+        "first_medication_taken": "5 days ago",
+        "first_medication_taken_recorded": "2018-06-01",
+        "height_at_booking_in_mm": 2000,
+        "induced": null,
+        "length_of_postnatal_stay_in_days": null,
+        "planned_delivery_place": null,
+        "pregnancy_complications": [],
+        "weight_at_36_weeks_in_g": null,
+        "weight_at_booking_in_g": 10000,
+        "weight_at_diagnosis_in_g": 10000
+      }
+    ]
+  }
+]

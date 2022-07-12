@@ -1,0 +1,1880 @@
+import json
+from datetime import date
+from typing import Any, Callable, Optional, Type
+
+import pytest
+from flask_batteries_included.helpers.error_handler import (
+    DuplicateResourceException,
+    EntityNotFoundException,
+)
+from flask_sqlalchemy import SQLAlchemy
+from marshmallow import Schema
+from mock import Mock
+from pytest_mock import MockerFixture
+
+from dhos_services_api.blueprint_patients import patient_controller
+from dhos_services_api.helpers import audit
+from dhos_services_api.models.api_response_spec import CompactPatientResponse
+from dhos_services_api.models.api_spec import (
+    AbbreviatedPatientResponse,
+    PatientDiabetesResponse,
+    PatientResponse,
+    PatientTermsResponseV2,
+)
+from dhos_services_api.sqlmodels.patient import (
+    query_options_compact_patient_response,
+    query_options_full_patient_response,
+    query_options_patient_list,
+)
+from tests.conftest import remove_dates
+
+LIMIT_FULL_PATIENT_RESPONSE = len(query_options_full_patient_response())
+LIMIT_COMPACT_PATIENT_RESPONSE = len(query_options_compact_patient_response())
+LIMIT_PATIENT_LIST_RESPONSE = len(query_options_patient_list())
+
+
+@pytest.mark.usefixtures("app", "uses_sql_database")
+class TestPatientController:
+    @pytest.fixture(autouse=True)
+    def mock_audit_record_patient_viewed(self, mocker: MockerFixture) -> Mock:
+        return mocker.patch.object(audit, "record_patient_viewed")
+
+    @pytest.fixture(autouse=True)
+    def mock_audit_record_patient_updated(self, mocker: MockerFixture) -> Mock:
+        return mocker.patch.object(audit, "record_patient_updated")
+
+    @pytest.fixture(autouse=True)
+    def mock_audit_record_patient_diabetes_type_changed(
+        self, mocker: MockerFixture
+    ) -> Mock:
+        return mocker.patch.object(audit, "record_patient_diabetes_type_changed")
+
+    @pytest.fixture(autouse=True)
+    def mock_audit_record_patient_archived(self, mocker: MockerFixture) -> Mock:
+        return mocker.patch.object(audit, "record_patient_archived")
+
+    @pytest.fixture
+    def _patient_with_delivery_uuid(
+        self,
+        gdm_patient_uuid: str,
+        mock_audit_record_patient_viewed: MockerFixture,
+        mock_audit_record_patient_updated: MockerFixture,
+        diabetes_patient_product: str,
+    ) -> str:
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "height_at_booking_in_mm": 1230,
+                        "weight_at_booking_in_g": 78000,
+                        "length_of_postnatal_stay_in_days": 2,
+                        "induced": True,
+                        "deliveries": [
+                            {
+                                "neonatal_complications": [],
+                                "patient": {"first_name": "Paul", "last_name": "Smith"},
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient = patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=update_data
+        )
+        return patient["uuid"]
+
+    @pytest.fixture
+    def _search_responses(self, diabetes_patient_product: str) -> dict[str, dict]:
+        return {
+            "P1": {
+                "bookmarked": False,
+                "dh_products": [
+                    {
+                        "closed_date": None,
+                        "closed_reason": None,
+                        "closed_reason_other": None,
+                        "product_name": diabetes_patient_product,
+                        "uuid": "DH1",
+                        "monitored_by_clinician": True,
+                    }
+                ],
+                "dob": None,
+                "first_name": "Jane",
+                "hospital_number": "MRN1",
+                "last_name": "Grey Dudley",
+                "locations": ["L1"],
+                "nhs_number": "8888888888",
+                "record": {
+                    "diagnoses": [
+                        {
+                            "diagnosed": None,
+                            "management_plan": {
+                                "end_date": date(2020, 1, 1),
+                                "sct_code": "67866001",
+                                "start_date": date(2019, 8, 26),
+                            },
+                            "sct_code": "11687002",
+                            "uuid": "DG1",
+                        }
+                    ],
+                    "pregnancies": [],
+                    "uuid": "R1",
+                },
+                "sex": None,
+                "uuid": "P1",
+                "fhir_resource_id": None,
+            },
+            "P4": {
+                "bookmarked": False,
+                "dh_products": [
+                    {
+                        "closed_date": None,
+                        "closed_reason": None,
+                        "closed_reason_other": None,
+                        "product_name": diabetes_patient_product,
+                        "uuid": "DH4",
+                        "monitored_by_clinician": True,
+                    }
+                ],
+                "dob": None,
+                "first_name": "Jane Grey",
+                "hospital_number": "9998887771",
+                "last_name": "Dudley",
+                "locations": ["L4"],
+                "nhs_number": None,
+                "record": {
+                    "diagnoses": [
+                        {
+                            "diagnosed": None,
+                            "management_plan": None,
+                            "sct_code": "11687002",
+                            "uuid": "DG4",
+                        }
+                    ],
+                    "pregnancies": [
+                        {
+                            "deliveries": [],
+                            "estimated_delivery_date": date(2020, 6, 4),
+                            "uuid": "Pr1",
+                        }
+                    ],
+                    "uuid": "R4",
+                },
+                "sex": None,
+                "uuid": "P4",
+                "fhir_resource_id": None,
+            },
+            "P5": {
+                "bookmarked": False,
+                "dh_products": [
+                    {
+                        "closed_date": date(2020, 1, 1),
+                        "closed_reason": None,
+                        "closed_reason_other": None,
+                        "product_name": diabetes_patient_product,
+                        "uuid": "DH5",
+                        "monitored_by_clinician": False,
+                    }
+                ],
+                "dob": None,
+                "first_name": None,
+                "hospital_number": "MRN5",
+                "last_name": None,
+                "locations": ["L5"],
+                "nhs_number": None,
+                "record": {"diagnoses": [], "pregnancies": [], "uuid": "R5"},
+                "sex": None,
+                "uuid": "P5",
+                "fhir_resource_id": None,
+            },
+            "P6": {
+                "accessibility_considerations": [],
+                "accessibility_considerations_other": None,
+                "allowed_to_email": None,
+                "allowed_to_text": None,
+                "bookmarked": False,
+                "created_by": "unknown",
+                "dh_products": [
+                    {
+                        "accessibility_discussed": False,
+                        "accessibility_discussed_date": None,
+                        "accessibility_discussed_with": None,
+                        "closed_date": None,
+                        "closed_reason": None,
+                        "closed_reason_other": None,
+                        "created_by": "unknown",
+                        "modified_by": "unknown",
+                        "product_name": "SEND",
+                        "uuid": "DH1S",
+                        "monitored_by_clinician": True,
+                    }
+                ],
+                "dob": None,
+                "dod": None,
+                "email_address": None,
+                "ethnicity": None,
+                "ethnicity_other": None,
+                "first_name": "Jane",
+                "has_been_bookmarked": False,
+                "height_in_mm": None,
+                "highest_education_level": None,
+                "highest_education_level_other": None,
+                "hospital_number": "MRN6",
+                "last_name": "Grey Dudley",
+                "locations": ["L1"],
+                "modified_by": "unknown",
+                "nhs_number": "8888888888",
+                "other_notes": None,
+                "personal_addresses": [],
+                "phone_number": None,
+                "record": {
+                    "created_by": "unknown",
+                    "diagnoses": [],
+                    "history": None,
+                    "modified_by": "unknown",
+                    "notes": [],
+                    "pregnancies": [],
+                    "uuid": "R6",
+                    "visits": [],
+                },
+                "sex": None,
+                "terms_agreement": None,
+                "uuid": "P6",
+                "weight_in_g": None,
+                "fhir_resource_id": None,
+            },
+        }
+
+    @pytest.fixture
+    def patient_search_response(
+        self, request: Any, _search_responses: dict[str, dict]
+    ) -> list[dict]:
+        return [_search_responses[p] for p in request.param]
+
+    def test_get_patient_fail(self) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.get_patient(patient_uuid="123", product_name="SEND")
+
+    @pytest.mark.parametrize(
+        "product_name",
+        ["SEND", None],
+    )
+    def test_get_patient(
+        self,
+        patient_uuid: str,
+        product_name: Optional[str],
+        mock_audit_record_patient_viewed: Mock,
+        statement_counter: Callable,
+        assert_valid_schema: Callable,
+    ) -> None:
+
+        with statement_counter(limit=LIMIT_FULL_PATIENT_RESPONSE):
+            patient_data = patient_controller.get_patient(
+                patient_uuid=patient_uuid, product_name=product_name
+            )
+        assert mock_audit_record_patient_viewed.called
+        assert patient_data["first_name"] == "Carol"
+        assert_valid_schema(PatientResponse, patient_data)
+
+    @pytest.mark.parametrize(
+        "compact,schema,limit",
+        [
+            (False, PatientResponse, LIMIT_FULL_PATIENT_RESPONSE),
+            (True, CompactPatientResponse, LIMIT_COMPACT_PATIENT_RESPONSE),
+        ],
+    )
+    def test_retrieve_patient_by_uuids(
+        self,
+        four_patient_uuids: list[str],
+        statement_counter: Callable,
+        assert_valid_schema: Callable,
+        compact: bool,
+        schema: Type[Schema],
+        limit: int,
+    ) -> None:
+        with statement_counter(limit=limit):
+            patient_data: list[dict] = patient_controller.retrieve_patients_by_uuids(
+                patient_uuids=four_patient_uuids,
+                product_name="SEND",
+                compact=compact,
+            )
+        assert len(patient_data) == 4
+        assert_valid_schema(schema, patient_data, many=True)
+
+    def test_retrieve_patient_by_uuids_fail_no_gdm_patients(
+        self,
+        four_patient_uuids: list[str],
+        diabetes_patient_product: str,
+    ) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.retrieve_patients_by_uuids(
+                patient_uuids=four_patient_uuids,
+                product_name=diabetes_patient_product,
+                compact=False,
+            )
+
+    def test_get_patient_abbreviated(
+        self, patient_uuid: str, assert_valid_schema: Callable
+    ) -> None:
+        patient_data = patient_controller.get_patient_abbreviated(
+            patient_uuid=patient_uuid
+        )
+        assert patient_data["uuid"] == patient_uuid
+        assert_valid_schema(AbbreviatedPatientResponse, patient_data)
+
+    def test_get_patient_by_record_uuid_not_compact(
+        self, patient_record_uuid: str, assert_valid_schema: Callable
+    ) -> None:
+        patient_data = patient_controller.get_patient_by_record_uuid(
+            record_id=patient_record_uuid, compact=False
+        )
+        assert patient_data["first_name"] == "Carol"
+        assert_valid_schema(PatientResponse, patient_data)
+
+    def test_get_patient_by_record_uuid_compact(self, patient_record_uuid: str) -> None:
+        patient_data = patient_controller.get_patient_by_record_uuid(
+            record_id=patient_record_uuid, compact=True
+        )
+        assert patient_data["first_name"] == "Carol"
+        assert "terms_agreement" not in patient_data
+
+    def test_get_patient_by_record_uuid_compact_fail_no_matching_record(self) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.get_patient_by_record_uuid(record_id="123", compact=True)
+
+    def patient_dict(
+        self,
+        product_name: str,
+        location_uuid: str,
+        clinician: str,
+        dob: str = "1992-04-23",
+        hospital_number: str = "147777799",
+    ) -> dict:
+        return {
+            "accessibility_considerations": [],
+            "allowed_to_text": True,
+            "dh_products": [
+                {
+                    "accessibility_discussed": True,
+                    "accessibility_discussed_date": "2019-04-29",
+                    "accessibility_discussed_with": clinician,
+                    "opened_date": "2019-04-29",
+                    "product_name": product_name,
+                }
+            ],
+            "dob": dob,
+            "email_address": "dolly@email.com",
+            "ethnicity": "185988007",
+            "first_name": "Diane",
+            "highest_education_level": "426769009",
+            "hospital_number": hospital_number,
+            "last_name": "Smith",
+            "locations": [location_uuid],
+            "other_notes": "",
+            "personal_addresses": [
+                {
+                    "address_line_1": "School House Stony Bridge Park",
+                    "address_line_2": "",
+                    "address_line_3": "",
+                    "address_line_4": "",
+                    "lived_from": "2013-12-31",
+                    "locality": "Oxford",
+                    "postcode": "OX5 3NA",
+                    "region": "Oxfordshire",
+                }
+            ],
+            "phone_number": "07123456789",
+            "record": {},
+            "sex": "248152002",
+            "height_in_mm": 1666,
+            "weight_in_g": 688,
+        }
+
+    @pytest.mark.parametrize(
+        "product_name",
+        ["GDM", "SEND", "NEW-PRODUCT", "DBM"],
+    )
+    def test_create_patient(
+        self,
+        product_name: str,
+        location_uuid: str,
+        clinician: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        patient_one = self.patient_dict(
+            product_name=product_name, location_uuid=location_uuid, clinician=clinician
+        )
+
+        created_patient = patient_controller.create_patient(
+            product_name=product_name, patient_details=patient_one
+        )
+        assert created_patient["first_name"] == "Diane"
+        assert created_patient["height_in_mm"] == 1666
+        assert_valid_schema(PatientResponse, created_patient)
+
+    def test_create_duplicate_patient(
+        self,
+        location_uuid: str,
+        clinician: str,
+    ) -> None:
+        product_name = "SEND"
+        patient_one = self.patient_dict(
+            product_name=product_name,
+            location_uuid=location_uuid,
+            clinician=clinician,
+            hospital_number="P1",
+        )
+
+        patient_two = self.patient_dict(
+            product_name=product_name,
+            location_uuid=location_uuid,
+            clinician=clinician,
+            dob="1966-03-01",
+            hospital_number="P2",
+        )
+
+        patient_three = self.patient_dict(
+            product_name=product_name,
+            location_uuid=location_uuid,
+            clinician=clinician,
+            dob="1966-03-01",
+            hospital_number="P3",
+        )
+
+        created_patient_one = patient_controller.create_patient(
+            product_name=product_name, patient_details=patient_one
+        )
+
+        # "Duplicate" allowed with different DOB
+        created_patient_two = patient_controller.create_patient(
+            product_name=product_name, patient_details=patient_two
+        )
+
+        assert created_patient_one["first_name"] == "Diane"
+        assert created_patient_two["first_name"] == "Diane"
+        with pytest.raises(DuplicateResourceException):
+            # Duplicate not allowed as same details already exist
+            patient_controller.create_patient(
+                product_name=product_name, patient_details=patient_three
+            )
+
+    @pytest.mark.parametrize("new_dpwttr", [5, 0])
+    def test_update_patient(
+        self,
+        patient_uuid: str,
+        diagnosis_uuid: str,
+        mock_audit_record_patient_updated: Mock,
+        new_dpwttr: int,
+        assert_valid_schema: Callable,
+    ) -> None:
+        fhir_resource_id = "some uuid"
+        update_data = {
+            "first_name": "Trudie",
+            "record": {
+                "diagnoses": [
+                    {
+                        "uuid": diagnosis_uuid,
+                        "readings_plan": {"days_per_week_to_take_readings": new_dpwttr},
+                    }
+                ]
+            },
+            "fhir_resource_id": fhir_resource_id,
+        }
+        updated_patient = patient_controller.update_patient(
+            patient_uuid=patient_uuid, patient_details=update_data
+        )
+        assert updated_patient["first_name"] == "Trudie"
+        assert (
+            updated_patient["record"]["diagnoses"][0]["readings_plan"][
+                "days_per_week_to_take_readings"
+            ]
+            == new_dpwttr
+        )
+        assert mock_audit_record_patient_updated.called
+        assert updated_patient["fhir_resource_id"] == fhir_resource_id
+        assert_valid_schema(PatientResponse, updated_patient)
+
+    @pytest.mark.parametrize("field", ["phone_number", "nhs_number"])
+    def test_remove_from_patient(
+        self, patient_uuid: str, mock_audit_record_patient_updated: Mock, field: str
+    ) -> None:
+        data_to_remove = {field: None}
+        patient_data = patient_controller.update_patient(
+            patient_uuid=patient_uuid, patient_details=data_to_remove
+        )
+        assert patient_data[field] is None
+        assert mock_audit_record_patient_updated.called
+
+    def test_remove_medications_from_patient(
+        self, location_uuid: str, clinician: str
+    ) -> None:
+        patch_data = {
+            "record": {
+                "diagnoses": [
+                    {
+                        "diagnosed": "2021-11-26",
+                        "presented": "2021-11-26",
+                        "diagnosis_tool": ["D0000012", "D0000013", "D0000018"],
+                        "risk_factors": ["162864005"],
+                        "diagnosis_tool_other": "",
+                        "observable_entities": [
+                            {
+                                "sct_code": "443911005",
+                                "date_observed": "2022-07-24",
+                                "value_as_string": "5",
+                                "metadata": {"tag": "last"},
+                            }
+                        ],
+                        "management_plan": {
+                            "sct_code": "67866001",
+                            "start_date": "2021-11-26",
+                            "end_date": "2022-07-24",
+                            "doses": [
+                                {
+                                    "medication_id": "155181000001100",
+                                    "dose_amount": 5,
+                                    "routine_sct_code": "1751000175104",
+                                },
+                                {
+                                    "medication_id": "155181000001100",
+                                    "dose_amount": 5,
+                                    "routine_sct_code": "1761000175102",
+                                },
+                            ],
+                        },
+                        "sct_code": "44054006",
+                    },
+                ]
+            }
+        }
+        product_name = "SEND"
+        patient_one = self.patient_dict(
+            product_name=product_name,
+            location_uuid=location_uuid,
+            clinician=clinician,
+            hospital_number="T1000",
+        )
+
+        created_patient = patient_controller.create_patient(
+            product_name=product_name, patient_details=patient_one
+        )
+        patient_uuid = created_patient["uuid"]
+        updated_patient = patient_controller.update_patient(
+            patient_uuid=patient_uuid, patient_details=patch_data
+        )
+        assert (
+            len(updated_patient["record"]["diagnoses"][0]["management_plan"]["doses"])
+            == 2
+        )
+
+        diagnosis_uuid = updated_patient["record"]["diagnoses"][0]["uuid"]
+        doses_uuid = updated_patient["record"]["diagnoses"][0]["management_plan"][
+            "doses"
+        ][0]["uuid"]
+        delete_data = {
+            "record": {
+                "diagnoses": [
+                    {
+                        "uuid": diagnosis_uuid,
+                        "management_plan": {"doses": [{"uuid": doses_uuid}]},
+                    }
+                ]
+            }
+        }
+        deleted_from = patient_controller.remove_from_patient(
+            patient_uuid=patient_uuid, fields_to_remove=delete_data
+        )
+        assert (
+            len(deleted_from["record"]["diagnoses"][0]["management_plan"]["doses"]) == 1
+        )
+
+    def test_close_patient_fail_no_height_at_booking_in_mm(
+        self, gdm_patient_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_not_gdm(self, patient_uuid: str) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=patient_uuid, product_name="SEND"
+        )
+        with pytest.raises(ValueError) as e:
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+        assert str(e.value) == "You cannot close SEND patients"
+
+    def test_close_patient_fail_no_weight_at_booking_in_g(
+        self, gdm_patient_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [{"uuid": pregnancy_id, "height_at_booking_in_mm": 1230}]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_length_of_postnatal_stay_in_days(
+        self, gdm_patient_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "height_at_booking_in_mm": 1230,
+                        "weight_at_booking_in_g": 78000,
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_induced(
+        self, gdm_patient_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "height_at_booking_in_mm": 1230,
+                        "weight_at_booking_in_g": 78000,
+                        "length_of_postnatal_stay_in_days": 2,
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_birth_weight_in_grams(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_birth_outcome(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {"uuid": delivery_id, "birth_weight_in_grams": 2300}
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_outcome_for_baby(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_weight_in_grams": 2300,
+                                "birth_outcome": "45718005",
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_neonatal_complications(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_weight_in_grams": 2300,
+                                "birth_outcome": "45718005",
+                                "outcome_for_baby": "169826009",
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_admitted_to_special_baby_care_unit(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_weight_in_grams": 2300,
+                                "birth_outcome": "45718005",
+                                "outcome_for_baby": "169826009",
+                                "neonatal_complications": ["shoulderDystocia"],
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_length_of_postnatal_stay_for_baby(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_weight_in_grams": 2300,
+                                "birth_outcome": "45718005",
+                                "outcome_for_baby": "169826009",
+                                "neonatal_complications": ["shoulderDystocia"],
+                                "admitted_to_special_baby_care_unit": True,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_dob_is_none(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_weight_in_grams": 2300,
+                                "birth_outcome": "45718005",
+                                "outcome_for_baby": "169826009",
+                                "neonatal_complications": ["shoulderDystocia"],
+                                "admitted_to_special_baby_care_unit": True,
+                                "length_of_postnatal_stay_for_baby": 3,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_date_of_termination_is_not_none(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_weight_in_grams": 2300,
+                                "birth_outcome": "45718005",
+                                "outcome_for_baby": "169826009",
+                                "neonatal_complications": ["shoulderDystocia"],
+                                "admitted_to_special_baby_care_unit": True,
+                                "length_of_postnatal_stay_for_baby": 3,
+                                "date_of_termination": "2018-08-09",
+                                "patient": {
+                                    "first_name": "Paul",
+                                    "last_name": "Smith",
+                                    "dob": "2018-08-09",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_date_of_termination_none(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_outcome": "386639001",
+                                "outcome_for_baby": "169826009",
+                                "length_of_postnatal_stay_for_baby": 3,
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_diagnosis_tool(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        diagnosis_id = patient["record"]["diagnoses"][0]["uuid"]
+        update_data = {
+            "record": {
+                "diagnoses": [{"uuid": diagnosis_id}],
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_outcome": "386639001",
+                                "outcome_for_baby": "169826009",
+                                "length_of_postnatal_stay_for_baby": 3,
+                                "date_of_termination": "2018-08-09",
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_fail_no_risk_factors(
+        self, _patient_with_delivery_uuid: str, diabetes_patient_product: str
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        diagnosis_id = patient["record"]["diagnoses"][0]["uuid"]
+        update_data = {
+            "record": {
+                "diagnoses": [{"uuid": diagnosis_id, "diagnosis_tool": ["D0000012"]}],
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_outcome": "386639001",
+                                "outcome_for_baby": "169826009",
+                                "length_of_postnatal_stay_for_baby": 3,
+                                "date_of_termination": "2018-08-09",
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+        with pytest.raises(KeyError):
+            patient_controller.close_patient(
+                patient_uuid=patient["uuid"],
+                product_uuid=patient["dh_products"][0]["uuid"],
+                patient_details=closing_data,
+            )
+
+    def test_close_patient_gdm(
+        self,
+        _patient_with_delivery_uuid: str,
+        mock_audit_record_patient_archived: Mock,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        delivery_id = patient["record"]["pregnancies"][0]["deliveries"][0]["uuid"]
+        diagnosis_id = patient["record"]["diagnoses"][0]["uuid"]
+        update_data = {
+            "record": {
+                "diagnoses": [
+                    {
+                        "uuid": diagnosis_id,
+                        "diagnosis_tool": ["D0000012"],
+                        "risk_factors": ["416855002"],
+                    }
+                ],
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "deliveries": [
+                            {
+                                "uuid": delivery_id,
+                                "birth_outcome": "386639001",
+                                "outcome_for_baby": "169826009",
+                                "length_of_postnatal_stay_for_baby": 3,
+                                "date_of_termination": "2018-08-09",
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+        patient_controller.update_patient(
+            patient_uuid=_patient_with_delivery_uuid, patient_details=update_data
+        )
+        patient_data = patient_controller.close_patient(
+            patient_uuid=patient["uuid"],
+            product_uuid=patient["dh_products"][0]["uuid"],
+            patient_details=closing_data,
+        )
+        assert patient_data["first_name"] == "Carol"
+        assert mock_audit_record_patient_archived.called
+        assert_valid_schema(PatientResponse, patient_data)
+
+    @pytest.mark.parametrize("diabetes_patient_product", ["DBM"])
+    def test_close_patient_dbm(
+        self,
+        _patient_with_delivery_uuid: str,
+        mock_audit_record_patient_archived: Mock,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        # DBM allows closing a patient without all the fields needed by GDM
+        closing_data = {"closed_date": "2019-08-01"}
+        patient = patient_controller.get_patient(
+            patient_uuid=_patient_with_delivery_uuid,
+            product_name=diabetes_patient_product,
+        )
+        patient_data = patient_controller.close_patient(
+            patient_uuid=patient["uuid"],
+            product_uuid=patient["dh_products"][0]["uuid"],
+            patient_details=closing_data,
+        )
+        assert patient_data["first_name"] == "Carol"
+        assert mock_audit_record_patient_archived.called
+        assert_valid_schema(PatientResponse, patient_data)
+
+    def test_update_patient_diabetes_type(
+        self,
+        gdm_patient_uuid: str,
+        mock_audit_record_patient_updated: Mock,
+        mock_audit_record_patient_diabetes_type_changed: Mock,
+        diabetes_patient_product: str,
+    ) -> None:
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        diagnosis_id: str = patient["record"]["diagnoses"][0]["uuid"]
+        old_diagnosis_sct_code: str = patient["record"]["diagnoses"][0]["sct_code"]
+        new_diagnosis_sct_code = "different_code_12345"
+        update_data = {
+            "record": {
+                "diagnoses": [
+                    {"sct_code": new_diagnosis_sct_code, "uuid": diagnosis_id}
+                ],
+            }
+        }
+        update_patient = patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=update_data
+        )
+        assert (
+            update_patient["record"]["diagnoses"][0]["sct_code"]
+            == new_diagnosis_sct_code
+        )
+        assert mock_audit_record_patient_updated.called
+        assert mock_audit_record_patient_diabetes_type_changed.call_count == 1
+        mock_audit_record_patient_diabetes_type_changed.assert_called_with(
+            patient_uuid=gdm_patient_uuid,
+            new_type=new_diagnosis_sct_code,
+            old_type=old_diagnosis_sct_code,
+        )
+
+    def test_create_send_patient(self, assert_valid_schema: Callable) -> None:
+        patient = {
+            "first_name": "Simone",
+            "last_name": "Biles",
+            "hospital_number": "10101010",
+            "record": {},
+        }
+        p = patient_controller.create_patient("SEND", patient)
+        assert p["first_name"] == patient["first_name"]
+        assert p["last_name"] == patient["last_name"]
+        assert p["hospital_number"] == patient["hospital_number"]
+        assert_valid_schema(PatientResponse, p)
+
+    def test_create_send_dod_patient(self, assert_valid_schema: Callable) -> None:
+        patient = {
+            "first_name": "Nadia",
+            "last_name": "Comăneci",
+            "hospital_number": "10",
+            "dod": "2050-10-10",
+            "record": {},
+        }
+        p = patient_controller.create_patient("SEND", patient)
+        assert p["first_name"] == patient["first_name"]
+        assert p["last_name"] == patient["last_name"]
+        assert p["hospital_number"] == patient["hospital_number"]
+        assert_valid_schema(PatientResponse, p)
+
+    @pytest.mark.parametrize(
+        "q,active,patient_search_response",
+        [
+            ("MRN2", True, []),
+            ("MRN1", True, ["P1"]),
+            ("mrn1", True, ["P1"]),
+            ("8888888888", True, ["P1"]),
+            ("9998887771", True, ["P4"]),
+            (None, True, ["P1", "P4"]),
+            (None, False, ["P5"]),
+            ("Jane", True, ["P1", "P4"]),
+            ("Jane Grey Dudley", True, ["P1", "P4"]),
+            ("Jane Grey", True, ["P1", "P4"]),
+            ("Grey", True, ["P1"]),
+            ("Dudley", True, ["P4"]),
+        ],
+        indirect=["patient_search_response"],
+    )
+    def test_search_patients(
+        self,
+        mocker: MockerFixture,
+        q: str,
+        patient_search_response: list[dict],
+        active: bool,
+        two_gdm_patients_one_with_children: Mock,
+        closed_gdm_patient: Mock,
+        diabetes_patient_product: str,
+        statement_counter: Callable,
+        assert_valid_schema: Callable,
+    ) -> None:
+        locs: list = ["L1", "L2", "L3", "L4", "L5"]
+        with statement_counter(limit=LIMIT_COMPACT_PATIENT_RESPONSE):
+            actual = patient_controller.search_patients(
+                search_text=q,
+                locations=locs,
+                product_name=diabetes_patient_product,
+                active=active,
+                expanded=False,
+            )
+        assert (
+            remove_dates(sorted(actual, key=lambda p: p["uuid"]))
+            == patient_search_response
+        )
+        assert_valid_schema(CompactPatientResponse, actual, many=True)
+
+    @pytest.mark.parametrize(
+        "q,active,patient_search_response",
+        [
+            ("MRN6", True, ["P6"]),
+        ],
+        indirect=["patient_search_response"],
+    )
+    def test_search_patients_expanded(
+        self,
+        mocker: MockerFixture,
+        q: str,
+        patient_search_response: list[dict],
+        active: bool,
+        one_send_patient: Mock,
+        statement_counter: Callable,
+        assert_valid_schema: Callable,
+    ) -> None:
+        locs: list = ["L1"]
+        with statement_counter(limit=LIMIT_FULL_PATIENT_RESPONSE):
+            actual = patient_controller.search_patients(
+                search_text=q,
+                locations=locs,
+                product_name="SEND",
+                active=active,
+                expanded=True,
+            )
+
+        assert (
+            remove_dates(sorted(actual, key=lambda p: p["uuid"]))
+            == patient_search_response
+        )
+        assert_valid_schema(PatientResponse, actual, many=True)
+
+    def test_search_patients_modified_since(
+        self,
+        mocker: MockerFixture,
+        two_gdm_patients_one_with_children: Mock,
+        closed_gdm_patient: Mock,
+        gdm_patients_modified: Mock,
+        diabetes_patient_product: str,
+        statement_counter: Callable,
+        assert_valid_schema: Callable,
+    ) -> None:
+        locs: list = ["L1", "L2", "L3", "L4", "L5"]
+        with statement_counter(limit=LIMIT_COMPACT_PATIENT_RESPONSE):
+            actual = patient_controller.search_patients(
+                locations=locs,
+                search_text=None,
+                product_name=diabetes_patient_product,
+                modified_since="2000-01-01T01:01:01.123+01:00",
+            )
+        # Result includes patients created without an aexplicit modified data (P1, P4)
+        # and with explicit modified date after the cutoff (P6)
+        # But not patient with a parent id (P2), closed patient (P5),
+        # or one with an explicit older modified date (P7)
+        assert {e["uuid"] for e in actual} == {"P1", "P4", "P6"}
+        assert_valid_schema(CompactPatientResponse, actual, many=True)
+
+    def test_delete_diagnosis(
+        self,
+        gdm_patient_uuid: str,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        assert len(patient["record"]["diagnoses"]) == 1
+        diagnosis_uuid = patient["record"]["diagnoses"][0]["uuid"]
+        data_to_delete = {"record": {"diagnoses": [{"uuid": diagnosis_uuid}]}}
+        updated_patient = patient_controller.remove_from_patient(
+            patient_uuid=gdm_patient_uuid, fields_to_remove=data_to_delete
+        )
+        assert len(updated_patient["record"]["diagnoses"]) == 0
+        assert_valid_schema(PatientResponse, updated_patient)
+
+    def test_delete_diagnosis_2(
+        self,
+        gdm_patient_uuid: str,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        assert len(patient["record"]["diagnoses"]) == 1
+        diagnosis_uuid = patient["record"]["diagnoses"][0]["uuid"]
+        data_to_delete = {
+            "record": {
+                "diagnoses": [
+                    {
+                        "diagnosed": None,
+                        "sct_code": "D0000001",
+                        "diagnosis_other": None,
+                        "uuid": diagnosis_uuid,
+                        "management_plan": {"doses": []},
+                    }
+                ]
+            }
+        }
+        updated_patient = patient_controller.remove_from_patient(
+            patient_uuid=gdm_patient_uuid, fields_to_remove=data_to_delete
+        )
+        # Delete diagnosis when other fields are present doesn't delete the diagnosis
+        assert len(updated_patient["record"]["diagnoses"]) == 1
+        assert_valid_schema(PatientResponse, updated_patient)
+
+    @pytest.fixture
+    def gdm_diagnosis_uuid(
+        self,
+        gdm_patient_uuid: str,
+        diabetes_patient_product: str,
+    ) -> str:
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        assert len(patient["record"]["diagnoses"]) == 1
+        diagnosis_uuid = patient["record"]["diagnoses"][0]["uuid"]
+        return diagnosis_uuid
+
+    @pytest.fixture
+    def gdm_dose_uuid(
+        self,
+        gdm_patient_uuid: str,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+        gdm_diagnosis_uuid: str,
+    ) -> str:
+        patch_data = {
+            "record": {
+                "diagnoses": [
+                    {
+                        "diagnosed": None,
+                        "sct_code": "D0000001",
+                        "diagnosis_other": None,
+                        "uuid": gdm_diagnosis_uuid,
+                        "management_plan": {
+                            "doses": [
+                                {
+                                    "medication_id": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+                                    "dose_amount": 1.5,
+                                    "routine_sct_code": "12345",
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        }
+        updated_patient = patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=patch_data
+        )
+        return updated_patient["record"]["diagnoses"][0]["management_plan"]["doses"][0][
+            "uuid"
+        ]
+
+    def test_delete_dose(
+        self,
+        gdm_patient_uuid: str,
+        gdm_diagnosis_uuid: str,
+        gdm_dose_uuid: str,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        data_to_delete = {
+            "record": {
+                "diagnoses": [
+                    {
+                        "uuid": gdm_diagnosis_uuid,
+                        "management_plan": {"doses": [{"uuid": gdm_dose_uuid}]},
+                    }
+                ]
+            }
+        }
+        updated_patient = patient_controller.remove_from_patient(
+            patient_uuid=gdm_patient_uuid, fields_to_remove=data_to_delete
+        )
+        assert len(updated_patient["record"]["diagnoses"]) == 1
+        assert (
+            len(updated_patient["record"]["diagnoses"][0]["management_plan"]["doses"])
+            == 0
+        )
+        assert (
+            len(
+                updated_patient["record"]["diagnoses"][0]["management_plan"][
+                    "dose_history"
+                ]
+            )
+            == 2
+        )
+        assert (
+            updated_patient["record"]["diagnoses"][0]["management_plan"][
+                "dose_history"
+            ][0]["action"]
+            == "delete"
+        )
+        assert (
+            updated_patient["record"]["diagnoses"][0]["management_plan"][
+                "dose_history"
+            ][1]["action"]
+            == "insert"
+        )
+
+    def test_create_patient_tos_v2(
+        self,
+        gdm_patient_uuid: str,
+        diabetes_patient_product: str,
+        assert_valid_schema: Callable,
+    ) -> None:
+        terms = {
+            "product_name": diabetes_patient_product,
+            "tou_version": 4,
+            "tou_accepted_timestamp": "2020-01-01T00:00:00.000Z",
+            "patient_notice_version": 3,
+            "patient_notice_accepted_timestamp": "2020-01-01T00:00:00.000Z",
+        }
+        result = patient_controller.create_patient_tos_v2(
+            patient_uuid=gdm_patient_uuid, terms_details=terms
+        )
+        assert result["tou_version"] == terms["tou_version"]
+        assert result["patient_notice_version"] == terms["patient_notice_version"]
+        assert_valid_schema(PatientTermsResponseV2, result)
+
+    VALID_NHS_NUMBERS = [
+        "1111111111",
+        "3314191243",
+        "0724930108",
+        "0327211369",
+        "4417554676",
+        "0406548390",
+        "9396398268",
+        "7566846191",
+        "0262326302",
+        "4597895833",
+        "8794137838",
+        "1208151150",
+        "1796099473",
+        "6076101741",
+        "0602459419",
+        "3179476176",
+    ]
+
+    @pytest.mark.parametrize("nhs_number", VALID_NHS_NUMBERS)
+    def test_ensure_valid_nhs_number_success(self, nhs_number: str) -> None:
+        result = patient_controller.ensure_valid_nhs_number(nhs_number)
+        assert result is True
+
+    @pytest.mark.parametrize(
+        "nhs_number",
+        [
+            "abcdefghij",
+            "123",
+            "123456789a",
+            *[format(int(v) + 1, "010") for v in VALID_NHS_NUMBERS],
+            *[format(int(v) - 1, "010") for v in VALID_NHS_NUMBERS],
+        ],
+    )
+    def test_ensure_valid_nhs_number_failure(self, nhs_number: str) -> None:
+        with pytest.raises(ValueError):
+            patient_controller.ensure_valid_nhs_number(nhs_number)
+
+    def test_stop_monitoring_patient(
+        self, mocker: MockerFixture, monitored_gdm_patient: Any
+    ) -> None:
+        mock_audit_record_patient_not_monitored_anymore = mocker.patch.object(
+            audit, "record_patient_not_monitored_anymore"
+        )
+
+        patient_data = patient_controller.set_patient_monitored_by_clinician(
+            patient_id="P9", product_id="DH9", monitored_by_clinician=False
+        )
+
+        assert not patient_data["dh_products"][0]["monitored_by_clinician"]
+        assert patient_data["dh_products"][0]["changes"]
+        assert (
+            patient_data["dh_products"][0]["changes"][0]["event"] == "stop monitoring"
+        )
+
+        mock_audit_record_patient_not_monitored_anymore.assert_called_once_with(
+            patient_id="P9", product_id="DH9"
+        )
+
+    def test_stop_monitoring_patient_not_found(
+        self, monitored_gdm_patient: Any
+    ) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P9",
+                product_id="asdasd;jkasdl;",
+                monitored_by_clinician=False,
+            )
+
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P1238123", product_id="GDM", monitored_by_clinician=False
+            )
+
+    def test_stop_monitoring_patient_closed(self) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P5", product_id="DH5", monitored_by_clinician=False
+            )
+
+    def test_stop_monitoring_patient_already_stopped(
+        self, not_monitored_gdm_patient: Any
+    ) -> None:
+        with pytest.raises(ValueError):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P8", product_id="DH8", monitored_by_clinician=False
+            )
+
+    def test_start_monitoring_patient(
+        self, mocker: MockerFixture, not_monitored_gdm_patient: Any
+    ) -> None:
+        mock_audit_record_patient_monitored = mocker.patch.object(
+            audit, "record_patient_monitored"
+        )
+
+        patient_data = patient_controller.set_patient_monitored_by_clinician(
+            patient_id="P8", product_id="DH8", monitored_by_clinician=True
+        )
+
+        assert patient_data["dh_products"][0]["monitored_by_clinician"]
+        assert patient_data["dh_products"][0]["changes"]
+        # N.B. This assertion is different than the NEO one. The neo unit test doesn't commit
+        # the initial setup so it ends up with the start event dated earlier than the stop.
+        assert (
+            patient_data["dh_products"][0]["changes"][-1]["event"] == "start monitoring"
+        )
+
+        mock_audit_record_patient_monitored.assert_called_once_with(
+            patient_id="P8", product_id="DH8"
+        )
+
+    def test_start_monitoring_patient_not_found(
+        self,
+        gdm_patient_uuid: str,
+        diabetes_patient_product: str,
+    ) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P9",
+                product_id="asdasd;jkasdl;",
+                monitored_by_clinician=True,
+            )
+
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P1238123", product_id="GDM", monitored_by_clinician=True
+            )
+
+    def test_start_monitoring_patient_closed(self) -> None:
+        with pytest.raises(EntityNotFoundException):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P5", product_id="DH5", monitored_by_clinician=True
+            )
+
+    def test_start_monitoring_patient_already_monitored(
+        self, monitored_gdm_patient: Any
+    ) -> None:
+        with pytest.raises(ValueError):
+            patient_controller.set_patient_monitored_by_clinician(
+                patient_id="P9", product_id="DH9", monitored_by_clinician=True
+            )
+
+    def test_patient_uuids(self, two_gdm_patients_one_with_children: Any) -> None:
+        uuids = patient_controller.get_patient_uuids(product_name="GDM")
+
+        assert set(uuids) == {"P1", "P4"}
+
+    @pytest.mark.parametrize(
+        "locs,expected",
+        [
+            (["L1", "L2", "L3", "L4", "L5"], {"P1", "P4", "P5", "P6", "P7"}),
+            (["L4", "L5"], {"P4", "P5"}),
+        ],
+    )
+    def test_patient_list(
+        self,
+        two_gdm_patients_one_with_children: Mock,
+        locs: list[str],
+        expected: set[str],
+        closed_gdm_patient: Mock,
+        gdm_patients_modified: Mock,
+        diabetes_patient_product: str,
+        statement_counter: Callable,
+        assert_valid_schema: Callable,
+    ) -> None:
+        # The magic number for the statement limit is one for the initial query plus one for each
+        # subquery call in the function being tested. This ensures all data is loaded either in the
+        # initial query or in one of its subqueries.
+        with statement_counter(limit=LIMIT_PATIENT_LIST_RESPONSE):
+            actual = patient_controller.patient_list(
+                product_name=diabetes_patient_product,
+                location_uuids=locs,
+            )
+
+        assert {e["uuid"] for e in actual} == expected
+        assert_valid_schema(PatientDiabetesResponse, actual, many=True)
+
+    def test_patient_janitor(self, _db: SQLAlchemy) -> None:
+        """Tests that the request made by Janitor will actually work to create a patient"""
+        data = """{
+            "allowed_to_text": false,
+            "first_name": "Isabel",
+            "last_name": "Kidd",
+            "phone_number": "07123456789",
+            "dob": "1990-07-17",
+            "nhs_number": "8813651384",
+            "hospital_number": "000000",
+            "email_address": "Isabel@email.com",
+            "dh_products": [
+                {
+                    "accessibility_discussed": true,
+                    "accessibility_discussed_with": "static_clinician_gdm_standard_4",
+                    "accessibility_discussed_date": "2022-01-01",
+                    "opened_date": "2022-01-01",
+                    "created": "2022-01-01T09:53:13.271Z",
+                    "created_by": "static_clinician_gdm_standard_4",
+                    "modified": "2022-01-01T09:53:13.271Z",
+                    "modified_by": "static_clinician_gdm_standard_4",
+                    "product_name": "GDM"
+                }
+            ],
+            "personal_addresses": [
+                {
+                    "address_line_1": "38 Stony Bridge Park",
+                    "address_line_2": "",
+                    "address_line_3": "",
+                    "address_line_4": "",
+                    "locality": "Reading",
+                    "region": "Berkshire",
+                    "postcode": "RG9 4VU",
+                    "lived_from": "2018-01-08"
+                }
+            ],
+            "ethnicity": "315236000",
+            "sex": "248152002",
+            "highest_education_level": "224302000",
+            "accessibility_considerations": [],
+            "other_notes": "",
+            "record": {
+                "notes": [],
+                "history": {"gravidity": 12, "parity": 0},
+                "pregnancies": [
+                    {
+                        "estimated_delivery_date": "2022-08-29",
+                        "planned_delivery_place": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+                        "length_of_postnatal_stay_in_days": 1,
+                        "colostrum_harvesting": true,
+                        "expected_number_of_babies": 2,
+                        "deliveries": [],
+                        "height_at_booking_in_mm": 1945,
+                        "weight_at_diagnosis_in_g": 61629,
+                        "weight_at_booking_in_g": 67791,
+                        "weight_at_36_weeks_in_g": 74570,
+                        "pregnancy_complications": ["178280004"],
+                        "created": "2022-01-01T09:53:13.271Z",
+                        "created_by": "static_clinician_gdm_standard_4",
+                        "modified": "2022-01-01T09:53:13.271Z",
+                        "modified_by": "static_clinician_gdm_standard_4"
+                    }
+                ],
+                "diagnoses": [
+                    {
+                        "sct_code": "702737001",
+                        "diagnosis_other": null,
+                        "diagnosed": "2022-01-01",
+                        "episode": 1,
+                        "presented": "2022-01-01",
+                        "diagnosis_tool": ["D0000013", "D0000018"],
+                        "diagnosis_tool_other": null,
+                        "risk_factors": ["162864005"],
+                        "observable_entities": [
+                            {
+                                "sct_code": "443911005",
+                                "date_observed": "2022-01-01",
+                                "value_as_string": "2",
+                                "metadata": {"tag": "first"}
+                            },
+                            {
+                                "sct_code": "443911005",
+                                "date_observed": "2022-08-29",
+                                "value_as_string": "5",
+                                "metadata": {"tag": "last"}
+                            }
+                        ],
+                        "management_plan": {
+                            "start_date": "2022-01-01",
+                            "end_date": "2022-08-29",
+                            "sct_code": "67866001",
+                            "doses": [
+                                {
+                                    "medication_id": "D0000047",
+                                    "dose_amount": 1.5,
+                                    "routine_sct_code": "1761000175102"
+                                }
+                            ],
+                            "actions": [{"action_sct_code": "12345"}]
+                        },
+                        "readings_plan": {
+                            "start_date": "2022-01-01",
+                            "end_date": "2022-08-29",
+                            "sct_code": "54321",
+                            "days_per_week_to_take_readings": 7,
+                            "readings_per_day": 4
+                        },
+                        "created": "2022-01-01T09:53:13.271Z",
+                        "created_by": "static_clinician_gdm_standard_4",
+                        "modified": "2022-01-01T09:53:13.271Z",
+                        "modified_by": "static_clinician_gdm_standard_4"
+                    }
+                ],
+                "visits": [
+                    {
+                        "visit_date": "2021-11-22T09:53:13.271Z",
+                        "summary": "Talked about diabetes",
+                        "location": "static_location_uuid_L2",
+                        "clinician_uuid": "static_clinician_uuid_D",
+                        "diagnoses": [],
+                        "created": "2021-11-22T09:53:13.271Z",
+                        "created_by": "static_clinician_uuid_D",
+                        "modified": "2021-11-22T09:53:13.271Z",
+                        "modified_by": "static_clinician_uuid_D"
+                    }
+                ],
+                "created": "2022-01-01T09:53:13.271Z",
+                "created_by": "static_clinician_gdm_standard_4",
+                "modified": "2022-01-01T09:53:13.271Z",
+                "modified_by": "static_clinician_gdm_standard_4"
+            },
+            "created": "2022-02-21T09:53:13.271Z",
+            "created_by": "static_clinician_gdm_standard_4",
+            "modified": "2022-02-21T09:53:13.271Z",
+            "modified_by": "static_clinician_gdm_standard_4",
+            "locations": ["static_location_uuid_L2"],
+            "uuid": "static_patient_uuid_0"
+        }"""
+        from dhos_services_api.blueprint_patients.patient_controller import (
+            create_patient,
+        )
+
+        pat = create_patient("GDM", json.loads(data))
+        assert pat["first_name"] == "Isabel"
+
+    def test_patch_delivery_creates_patient(
+        self,
+        gdm_patient_uuid: str,
+        mock_audit_record_patient_viewed: MockerFixture,
+        mock_audit_record_patient_updated: MockerFixture,
+        diabetes_patient_product: str,
+    ) -> None:
+        patient = patient_controller.get_patient(
+            patient_uuid=gdm_patient_uuid, product_name=diabetes_patient_product
+        )
+        pregnancy_id = patient["record"]["pregnancies"][0]["uuid"]
+        update_data = {
+            "record": {
+                "pregnancies": [
+                    {
+                        "uuid": pregnancy_id,
+                        "height_at_booking_in_mm": 1230,
+                        "weight_at_booking_in_g": 78000,
+                        "length_of_postnatal_stay_in_days": 2,
+                        "induced": True,
+                        "deliveries": [
+                            {
+                                "admitted_to_special_baby_care_unit": False,
+                                "neonatal_complications": ["D0000025"],
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        patient = patient_controller.update_patient(
+            patient_uuid=gdm_patient_uuid, patient_details=update_data
+        )
+        deliveries = patient["record"]["pregnancies"][0]["deliveries"]
+        assert len(deliveries) == 1
+        baby = deliveries[0]["patient"]
+        assert baby is not None and baby["dob"] is None

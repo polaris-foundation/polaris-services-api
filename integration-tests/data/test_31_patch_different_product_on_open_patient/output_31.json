@@ -1,0 +1,58 @@
+[
+  {
+    "op": "test",
+    "path": "/dh_products/0/accessibility_discussed_with/uuid",
+    "value_format": "{context.hollie_white}"
+  },
+  {
+    "op": "remove",
+    "path": "/dh_products/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/dh_products/0/accessibility_discussed_with"
+  },
+  {
+    "op": "remove",
+    "path": "/dh_products/1/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/dh_products/1/accessibility_discussed_with"
+  },
+  {
+    "op": "remove",
+    "path": "/dh_products/2/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/dh_products",
+    "value": [
+      {
+        "accessibility_discussed": true,
+        "accessibility_discussed_date": "2019-03-27",
+        "closed_date": null,
+        "closed_reason": null,
+        "closed_reason_other": null,
+        "opened_date": "2018-07-14",
+        "product_name": "Type 1"
+      },
+      {
+        "accessibility_discussed": true,
+        "accessibility_discussed_date": "2018-03-27",
+        "closed_date": null,
+        "closed_reason": null,
+        "closed_reason_other": null,
+        "opened_date": "2015-07-14",
+        "product_name": "GDM"
+      },
+      {
+        "closed_date": null,
+        "closed_reason": null,
+        "closed_reason_other": null,
+        "opened_date": "1970-01-01",
+        "product_name": "GDM"
+      }
+    ]
+  }
+]

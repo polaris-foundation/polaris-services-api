@@ -1,0 +1,9 @@
+.git
+.mypy_cache
+.pytest_cache
+.tox
+coverage-reports
+.circleci
+.common
+integration-tests
+.python-version

@@ -1,0 +1,27 @@
+[
+  {
+    "op": "test",
+    "path": "/dh_products/0/closed_date",
+    "value": "1970-01-01"
+  },
+  {
+    "op": "test",
+    "path": "/dh_products/0/closed_reason",
+    "value": "some really good reason"
+  },
+    {
+    "op": "test",
+    "path": "/dh_products/0/monitored_by_clinician",
+    "value": false
+  },
+  {
+    "op": "test",
+    "path": "/dh_products/0/changes/0/event",
+    "value": "stop monitoring"
+  },
+    {
+    "op": "test",
+    "path": "/dh_products/0/changes/1/event",
+    "value": "archive"
+  }
+]

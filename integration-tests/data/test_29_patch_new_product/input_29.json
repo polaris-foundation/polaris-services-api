@@ -1,0 +1,20 @@
+{
+  "data": {
+    "dh_products": [
+      {
+        "accessibility_discussed": true,
+        "accessibility_discussed_date": "2018-03-27",
+        "accessibility_discussed_with": "B",
+        "opened_date": "2015-07-14",
+        "product_name": "GDM"
+      }
+    ]
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/dh_products/0/accessibility_discussed_with",
+      "value_format": "{context.kiara_welsh}"
+    }
+  ]
+}

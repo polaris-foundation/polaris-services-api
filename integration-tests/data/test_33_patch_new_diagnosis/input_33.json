@@ -1,0 +1,42 @@
+{
+  "record": {
+    "diagnoses": [
+      {
+        "diagnosed": "2013-01-01",
+        "diagnosis_other": "A nasty diagnosis",
+        "diagnosis_tool": [
+          "1234567890"
+        ],
+        "diagnosis_tool_other": "some tool",
+        "episode": 3,
+        "management_plan": {
+          "actions": [
+            {
+              "action_sct_code": "12345"
+            }
+          ],
+          "doses": [
+            {
+              "dose_amount": 2.5,
+              "medication_id": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+              "routine_sct_code": "12345"
+            }
+          ],
+          "end_date": "2013-05-01",
+          "sct_code": "386359008",
+          "start_date": "2013-01-01"
+        },
+        "observable_entities": [],
+        "presented": "1970-01-01",
+        "sct_code": "1234567890"
+      }
+    ],
+    "history": {
+      "gravidity": 1,
+      "parity": 1
+    },
+    "notes": [],
+    "pregnancies": [],
+    "visits": []
+  }
+}

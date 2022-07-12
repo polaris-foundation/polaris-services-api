@@ -1,0 +1,43 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/doses/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/locations",
+    "value_format": [
+      "{context.location_uuid}"
+    ]
+  },
+  {
+    "op": "remove",
+    "path": "/locations"
+  },
+  {
+    "op": "test",
+    "path": "",
+    "value": {
+      "record": {
+        "diagnoses": [
+          {
+            "management_plan": {
+              "doses": [
+                {
+                  "changes": [],
+                  "dose_amount": 1.5,
+                  "medication_id": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+                  "routine_sct_code": "12345"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+]

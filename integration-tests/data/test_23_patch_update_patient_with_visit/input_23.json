@@ -1,0 +1,27 @@
+{
+  "data": {
+    "record": {
+      "visits": [
+        {
+          "clinician": "D",
+          "diagnoses": [],
+          "location": "L1",
+          "summary": "a summary of the visit",
+          "visit_date": "2018-04-11T14:52:06.643Z"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/visits/0/clinician",
+      "value_format": "{context.clinician_uuid}"
+    },
+    {
+      "op": "replace",
+      "path": "/record/visits/0/location",
+      "value_format": "{context.location_uuid}"
+    }
+  ]
+}

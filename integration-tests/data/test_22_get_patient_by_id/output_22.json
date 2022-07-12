@@ -1,0 +1,12 @@
+[
+  {
+    "op": "test",
+    "path": "/bookmarked",
+    "value": false
+  },
+  {
+    "op": "test",
+    "path": "/has_been_bookmarked",
+    "value": true
+  }
+]

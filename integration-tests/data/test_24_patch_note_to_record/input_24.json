@@ -1,0 +1,19 @@
+{
+  "data": {
+    "record": {
+      "notes": [
+        {
+          "clinician": "D",
+          "content": "Will need to monitor patient closely"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/notes/0/clinician",
+      "value_format": "{context.clinician_uuid}"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "op": "remove",
+    "path": "/accepted_timestamp"
+  },
+  {
+    "op": "remove",
+    "path": "/uuid"
+  },
+  {
+    "op": "test",
+    "path": "",
+    "value": {
+      "product_name": "GDM",
+      "version": 1
+    }
+  }
+]

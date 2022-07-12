@@ -1,0 +1,19 @@
+{
+  "address_line_1": "Headley Way",
+  "address_line_2": "Headington",
+  "address_line_3": "An address fragment",
+  "address_line_4": "A fourth address fragment",
+  "country": "UK",
+  "dh_products": [
+    {
+      "opened_date": "2018-08-01",
+      "product_name": "GDM"
+    }
+  ],
+  "display_name": "Big old Hospital",
+  "locality": "Oxford",
+  "location_type": "D0000009",
+  "ods_code": "BOH",
+  "postcode": "OX3 9DU",
+  "region": "Oxfordshire"
+}

@@ -1,0 +1,30 @@
+{
+  "data": {
+    "record": {
+      "pregnancies": [
+        {
+          "colostrum_harvesting": true,
+          "deliveries": [],
+          "delivery_place": null,
+          "delivery_place_other": null,
+          "estimated_delivery_date": "2018-09-05",
+          "expected_number_of_babies": 1,
+          "first_medication_taken": "5 days ago",
+          "first_medication_taken_recorded": "2018-06-01",
+          "height_at_booking_in_mm": 2000,
+          "induced": null,
+          "pregnancy_complications": [],
+          "weight_at_booking_in_g": 10000,
+          "weight_at_diagnosis_in_g": 10000
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/estimated_delivery_date",
+      "value_format": "{context.estimated_delivery_date}"
+    }
+  ]
+}

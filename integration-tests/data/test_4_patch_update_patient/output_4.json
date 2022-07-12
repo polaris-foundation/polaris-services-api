@@ -1,0 +1,3 @@
+[
+  {"op": "test", "path": "/locations", "value_format": ["{context.location_uuid}", "{context.alternate_location_uuid}"]}
+]

@@ -1,0 +1,117 @@
+{
+  "allowed_to_text": true,
+  "first_name": "Trudie",
+  "phone_number": "07123456789",
+  "dob": "1970-01-01",
+  "nhs_number": "9514148533",
+  "hospital_number": "a1b2c3d4e5f6",
+  "email_address": "Trudie@email.com",
+  "dh_products": [
+    {
+        "product_name": "GDM",
+        "opened_date": "1970-01-01",
+        "accessibility_discussed": true,
+        "accessibility_discussed_with": "1",
+        "accessibility_discussed_date": "2018-03-27"
+    }
+  ],
+  "personal_addresses": [
+    {
+      "address_line_1": "42 Some Street",
+      "address_line_2": "",
+      "address_line_3": "",
+      "address_line_4": "",
+      "locality": "Oxford",
+      "region": "Oxfordshire",
+      "postcode": "OX3 5TF",
+      "country": "England",
+      "lived_from": "1970-01-01",
+      "lived_until": "1970-01-01"
+    }
+  ],
+  "ethnicity": "13233008",
+  "sex": "23456",
+  "highest_education_level": "426769009",
+  "accessibility_considerations": [],
+  "other_notes": "",
+  "record": {
+    "notes": [],
+    "history": {
+      "gravidity": 1,
+      "parity": 1
+    },
+    "pregnancies": [
+        {
+            "estimated_delivery_date": "1970-01-01",
+            "planned_delivery_place": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+            "length_of_postnatal_stay_in_days": 2,
+            "colostrum_harvesting": true,
+            "expected_number_of_babies": 1,
+            "deliveries": [
+                {
+                    "birth_outcome": "123456",
+                    "outcome_for_baby": "234567",
+                    "neonatal_complications": ["123456"],
+                    "neonatal_complications_other": "123456",
+                    "admitted_to_special_baby_care_unit": false,
+                    "birth_weight_in_grams": 1000,
+                    "length_of_postnatal_stay_for_baby": 2,
+                    "apgar_1_minute": 123,
+                    "apgar_5_minute": 321,
+                    "feeding_method": "132",
+                    "patient": {}
+                }
+            ],
+            "height_at_booking_in_mm": 2000,
+            "weight_at_diagnosis_in_g": 10000,
+            "weight_at_booking_in_g": 10000,
+            "weight_at_36_weeks_in_g": 10000
+        }
+    ],
+    "diagnoses": [
+      {
+        "sct_code": "1234567890",
+        "diagnosed": "1970-01-01",
+        "episode": 1,
+        "presented": "1970-01-01",
+        "diagnosis_tool": ["1234567890"],
+        "diagnosis_tool_other": "1234567890",
+        "risk_factors": [
+          "1234567890"
+        ],
+        "observable_entities": [
+            {
+              "sct_code": "123456789",
+              "date_observed": "1970-01-01",
+              "value_as_string": "A value"
+            }
+        ],
+        "management_plan": {
+          "start_date": "1970-01-01",
+          "end_date": "1970-01-01",
+          "sct_code": "386359008",
+          "doses": [
+            {
+              "medication_id": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+              "dose_amount": 1.5,
+              "routine_sct_code": "12345"
+            }
+          ],
+          "actions": [
+            {
+              "action_sct_code": "12345"
+            }
+          ]
+        },
+        "readings_plan": {
+          "start_date": "1970-01-01",
+          "end_date": "1970-01-01",
+          "sct_code": "33747003",
+          "days_per_week_to_take_readings": 7,
+          "readings_per_day": 4
+        }
+      }
+    ]
+  },
+  "locations": []
+}

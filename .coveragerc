@@ -1,0 +1,19 @@
+[paths]
+source =
+    dhos_services_api/*
+
+[report]
+
+omit =
+  **/__main__.py
+  dhos_services_api/app.py
+  dhos_services_api/autoapp.py
+  dhos_services_api/error_handler.py
+  dhos_services_api/neodb.py
+  dhos_services_api/blueprint_development/*
+  dhos_services_api/sample_data/*
+
+fail_under = 91
+
+show_missing = true
+skip_covered = true

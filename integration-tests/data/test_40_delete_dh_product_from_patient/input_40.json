@@ -1,0 +1,16 @@
+{
+  "data": {
+    "dh_products": [
+      {
+        "uuid": "dh_product_uuid"
+      }
+    ]
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/dh_products/0/uuid",
+      "value_format": "{context.dh_product_uuid}"
+    }
+  ]
+}

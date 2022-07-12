@@ -1,0 +1,38 @@
+[
+  {
+    "op": "remove",
+    "path": "/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/dh_products/0/uuid"
+  },
+  {
+    "op": "test",
+    "path": "",
+    "value": {
+      "active": true,
+      "address_line_1": "Headley Way",
+      "address_line_2": "Headington",
+      "address_line_3": "An address fragment",
+      "address_line_4": "A fourth address fragment",
+      "bookmarked": [],
+      "clinician_bookmark": false,
+      "country": "UK",
+      "dh_products": [
+        {
+          "closed_date": null,
+          "opened_date": "2018-08-01",
+          "product_name": "GDM"
+        }
+      ],
+      "display_name": "Big old Hospital",
+      "locality": "Oxford",
+      "location_type": "D0000009",
+      "ods_code": "BOH",
+      "parents": [],
+      "postcode": "OX3 9DU",
+      "region": "Oxfordshire"
+    }
+  }
+]

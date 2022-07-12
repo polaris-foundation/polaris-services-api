@@ -1,0 +1,12 @@
+[
+  {
+    "op": "test",
+    "path": "/dh_products/0/monitored_by_clinician",
+    "value": true
+  },
+  {
+    "op": "test",
+    "path": "/dh_products/0/changes/1/event",
+    "value": "start monitoring"
+  }
+]

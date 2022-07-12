@@ -1,0 +1,14 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/history/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/record/history",
+    "value": {
+      "gravidity": 5,
+      "parity": 1
+    }
+  }
+]

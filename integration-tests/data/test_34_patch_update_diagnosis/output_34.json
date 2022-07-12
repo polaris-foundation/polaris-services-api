@@ -1,0 +1,66 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/dose_history"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/actions/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/doses/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/1"
+  },
+  {
+    "op": "test",
+    "path": "/record/diagnoses",
+    "value": [
+      {
+        "diagnosed": "2013-01-01",
+        "diagnosis_other": "A completely different diagnosis",
+        "diagnosis_tool": [
+          "1234567890"
+        ],
+        "diagnosis_tool_other": "some tool",
+        "episode": 3,
+        "management_plan": {
+          "actions": [
+            {
+              "action_sct_code": "12345"
+            }
+          ],
+          "doses": [
+            {
+              "changes": [],
+              "dose_amount": 2.5,
+              "medication_id": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+              "routine_sct_code": "12345"
+            }
+          ],
+          "end_date": "2013-05-01",
+          "plan_history": [],
+          "sct_code": "386359008",
+          "start_date": "2013-01-01"
+        },
+        "observable_entities": [],
+        "presented": "1970-01-01",
+        "readings_plan": null,
+        "resolved": null,
+        "risk_factors": [],
+        "sct_code": "1234567890"
+      }
+    ]
+  }
+]

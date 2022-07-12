@@ -1,0 +1,47 @@
+[
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/dose_history"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/plan_history"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/actions/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/doses/0/changes"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/doses/0/uuid"
+  },
+  {
+    "op": "remove",
+    "path": "/record/diagnoses/0/management_plan/uuid"
+  },
+  {
+    "op": "test",
+    "path": "/record/diagnoses/0/management_plan",
+    "value": {
+      "actions": [
+        {
+          "action_sct_code": "12345"
+        }
+      ],
+      "doses": [
+        {
+          "dose_amount": 3.5,
+          "medication_id": "99b1668c-26f1-4aec-88ca-597d3a20d977",
+          "routine_sct_code": "12345"
+        }
+      ],
+      "end_date": "1970-01-01",
+      "sct_code": "55555",
+      "start_date": "1970-01-01"
+    }
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "op": "test",
+    "path": "",
+    "value": {
+      "message": "'induced is required to close a record'"
+    }
+  }
+]

@@ -1,0 +1,400 @@
+@startuml
+
+skinparam defaultFontName Courier
+
+Class Delivery {
+    VARCHAR[36]       ★ uuid                              
+    VARCHAR           ☆ patient_id                        
+    VARCHAR           ☆ pregnancy_id                      
+    BOOLEAN           ⚪ admitted_to_special_baby_care_unit
+    INTEGER           ⚪ apgar_1_minute                    
+    INTEGER           ⚪ apgar_5_minute                    
+    VARCHAR           ⚪ birth_outcome                     
+    INTEGER           ⚪ birth_weight_in_grams             
+    DATETIME          ⚪ created                           
+    VARCHAR           ⚪ created_by_                       
+    DATE              ⚪ date_of_termination               
+    VARCHAR           ⚪ feeding_method                    
+    INTEGER           ⚪ length_of_postnatal_stay_for_baby 
+    DATETIME          ⚪ modified                          
+    VARCHAR           ⚪ modified_by_                      
+    JSON              ⚪ neonatal_complications            
+    VARCHAR           ⚪ neonatal_complications_other      
+    VARCHAR           ⚪ outcome_for_baby                  
+    +                 patient                             
+    recursive_patch()                                     
+    INDEX[patient_id] » ix_delivery_patient_id            
+}
+
+Class Diagnosis {
+    VARCHAR[36]       ★ uuid                
+    VARCHAR           ☆ record_id           
+    DATETIME          ⚪ created             
+    VARCHAR           ⚪ created_by_         
+    DATE              ⚪ diagnosed           
+    VARCHAR           ⚪ diagnosis_other     
+    JSON              ⚪ diagnosis_tool      
+    VARCHAR           ⚪ diagnosis_tool_other
+    INTEGER           ⚪ episode             
+    DATETIME          ⚪ modified            
+    VARCHAR           ⚪ modified_by_        
+    DATE              ⚪ presented           
+    DATE              ⚪ resolved            
+    JSON              ⚪ risk_factors        
+    VARCHAR           ⚪ sct_code            
+    +                 management_plan       
+    +                 observable_entities   
+    +                 readings_plan         
+    +                 record                
+    recursive_patch()                       
+}
+
+Class Dose {
+    VARCHAR[36] ★ uuid              
+    VARCHAR     ☆ management_plan_id
+    DATETIME    ⚪ created           
+    VARCHAR     ⚪ created_by_       
+    FLOAT       ⚪ dose_amount       
+    VARCHAR     ⚪ medication_id     
+    DATETIME    ⚪ modified          
+    VARCHAR     ⚪ modified_by_      
+    VARCHAR     ⚪ routine_sct_code  
+    +           changes             
+    +           management_plan     
+    on_delete()                     
+    on_patch()                      
+}
+
+Class DoseChange {
+    VARCHAR[36] ★ uuid            
+    VARCHAR     ☆ dose_id         
+    DATETIME    ⚪ created         
+    VARCHAR     ⚪ created_by_     
+    FLOAT       ⚪ dose_amount     
+    VARCHAR     ⚪ medication_id   
+    DATETIME    ⚪ modified        
+    VARCHAR     ⚪ modified_by_    
+    VARCHAR     ⚪ routine_sct_code
+}
+
+Class DoseHistory {
+    VARCHAR[36] ★ uuid              
+    VARCHAR     ☆ dose_id           
+    VARCHAR     ☆ management_plan_id
+    VARCHAR     ⚪ action            
+    VARCHAR     ⚪ clinician_uuid    
+    DATETIME    ⚪ created           
+    VARCHAR     ⚪ created_by_       
+    DATETIME    ⚪ modified          
+    VARCHAR     ⚪ modified_by_      
+    +           dose                
+}
+
+Class DraysonHealthProduct {
+    VARCHAR[36]         ★ uuid                        
+    VARCHAR             ☆ patient_id                  
+    BOOLEAN             ⚪ accessibility_discussed     
+    DATE                ⚪ accessibility_discussed_date
+    VARCHAR             ⚪ accessibility_discussed_with
+    DATE                ⚪ closed_date                 
+    VARCHAR             ⚪ closed_reason               
+    VARCHAR             ⚪ closed_reason_other         
+    DATETIME            ⚪ created                     
+    VARCHAR             ⚪ created_by_                 
+    DATETIME            ⚪ modified                    
+    VARCHAR             ⚪ modified_by_                
+    BOOLEAN             ⚪ monitored_by_clinician      
+    DATE                ⚪ opened_date                 
+    VARCHAR             ⚪ product_name                
+    +                   changes                       
+    +                   patient                       
+    close()                                           
+    on_patch()                                        
+    pack_base_product()                               
+    start_monitoring()                                
+    stop_monitoring()                                 
+}
+
+Class DraysonHealthProductChange {
+    VARCHAR[36] ★ uuid                     
+    VARCHAR     ☆ drayson_health_product_id
+    DATETIME    ⚪ created                  
+    VARCHAR     ⚪ created_by_              
+    VARCHAR     ⚪ event                    
+    DATETIME    ⚪ modified                 
+    VARCHAR     ⚪ modified_by_             
+}
+
+Class History {
+    VARCHAR[36] ★ uuid        
+    VARCHAR     ☆ record_id   
+    DATETIME    ⚪ created     
+    VARCHAR     ⚪ created_by_ 
+    INTEGER     ⚪ gravidity   
+    DATETIME    ⚪ modified    
+    VARCHAR     ⚪ modified_by_
+    INTEGER     ⚪ parity      
+}
+
+Class ManagementPlan {
+    VARCHAR[36]       ★ uuid        
+    VARCHAR           ☆ diagnosis_id
+    DATETIME          ⚪ created     
+    VARCHAR           ⚪ created_by_ 
+    DATE              ⚪ end_date    
+    DATETIME          ⚪ modified    
+    VARCHAR           ⚪ modified_by_
+    JSON              ⚪ plan_history
+    VARCHAR           ⚪ sct_code    
+    DATE              ⚪ start_date  
+    +                 actions       
+    +                 dose_history  
+    +                 doses         
+    add_history()                   
+    recursive_patch()               
+}
+
+Class NonMedicationAction {
+    VARCHAR[36] ★ uuid              
+    VARCHAR     ☆ management_plan_id
+    VARCHAR     ⚪ action_sct_code   
+    DATETIME    ⚪ created           
+    VARCHAR     ⚪ created_by_       
+    DATETIME    ⚪ modified          
+    VARCHAR     ⚪ modified_by_      
+}
+
+Class Note {
+    VARCHAR[36] ★ uuid          
+    VARCHAR     ☆ record_id     
+    VARCHAR     ⚪ clinician_uuid
+    VARCHAR     ⚪ content       
+    DATETIME    ⚪ created       
+    VARCHAR     ⚪ created_by_   
+    DATETIME    ⚪ modified      
+    VARCHAR     ⚪ modified_by_  
+}
+
+Class Pregnancy {
+    VARCHAR[36]       ★ uuid                            
+    VARCHAR           ☆ record_id                       
+    BOOLEAN           ⚪ colostrum_harvesting            
+    DATETIME          ⚪ created                         
+    VARCHAR           ⚪ created_by_                     
+    VARCHAR           ⚪ delivery_place                  
+    VARCHAR           ⚪ delivery_place_other            
+    DATE              ⚪ estimated_delivery_date         
+    INTEGER           ⚪ expected_number_of_babies       
+    VARCHAR           ⚪ first_medication_taken          
+    DATE              ⚪ first_medication_taken_recorded 
+    INTEGER           ⚪ height_at_booking_in_mm         
+    BOOLEAN           ⚪ induced                         
+    INTEGER           ⚪ length_of_postnatal_stay_in_days
+    DATETIME          ⚪ modified                        
+    VARCHAR           ⚪ modified_by_                    
+    VARCHAR           ⚪ planned_delivery_place          
+    JSON              ⚪ pregnancy_complications         
+    INTEGER           ⚪ weight_at_36_weeks_in_g         
+    INTEGER           ⚪ weight_at_booking_in_g          
+    INTEGER           ⚪ weight_at_diagnosis_in_g        
+    +                 deliveries                        
+    recursive_patch()                                   
+}
+
+Class ReadingsPlan {
+    VARCHAR[36] ★ uuid                          
+    VARCHAR     ☆ diagnosis_id                  
+    DATETIME    ⚪ created                       
+    VARCHAR     ⚪ created_by_                   
+    INTEGER     ⚪ days_per_week_to_take_readings
+    DATE        ⚪ end_date                      
+    DATETIME    ⚪ modified                      
+    VARCHAR     ⚪ modified_by_                  
+    INTEGER     ⚪ readings_per_day              
+    VARCHAR     ⚪ sct_code                      
+    DATE        ⚪ start_date                    
+    +           changes                         
+    on_patch()                                  
+}
+
+Class ReadingsPlanChange {
+    VARCHAR[36] ★ uuid                          
+    VARCHAR     ☆ readings_plan_id              
+    DATETIME    ⚪ created                       
+    VARCHAR     ⚪ created_by_                   
+    INTEGER     ⚪ days_per_week_to_take_readings
+    DATETIME    ⚪ modified                      
+    VARCHAR     ⚪ modified_by_                  
+    INTEGER     ⚪ readings_per_day              
+}
+
+Class ObservableEntity {
+    VARCHAR[36]       ★ uuid           
+    VARCHAR           ☆ diagnosis_id   
+    DATETIME          ⚪ created        
+    VARCHAR           ⚪ created_by_    
+    DATE              ⚪ date_observed  
+    JSON              ⚪ metadata_      
+    DATETIME          ⚪ modified       
+    VARCHAR           ⚪ modified_by_   
+    VARCHAR           ⚪ sct_code       
+    VARCHAR           ⚪ value_as_string
+    recursive_patch()                  
+}
+
+Class PersonalAddress {
+    VARCHAR[36] ★ uuid          
+    VARCHAR     ☆ patient_id    
+    VARCHAR     ⚪ address_line_1
+    VARCHAR     ⚪ address_line_2
+    VARCHAR     ⚪ address_line_3
+    VARCHAR     ⚪ address_line_4
+    VARCHAR     ⚪ country       
+    DATETIME    ⚪ created       
+    VARCHAR     ⚪ created_by_   
+    DATE        ⚪ lived_from    
+    DATE        ⚪ lived_until   
+    VARCHAR     ⚪ locality      
+    DATETIME    ⚪ modified      
+    VARCHAR     ⚪ modified_by_  
+    VARCHAR     ⚪ postcode      
+    VARCHAR     ⚪ region        
+}
+
+Class Patient {
+    VARCHAR[36]            ★ uuid                              
+    VARCHAR                ☆ parent_patient_id                 
+    VARCHAR                ☆ record_id                         
+    JSON                   ⚪ accessibility_considerations      
+    VARCHAR                ⚪ accessibility_considerations_other
+    BOOLEAN                ⚪ allowed_to_email                  
+    BOOLEAN                ⚪ allowed_to_text                   
+    ARRAY                  ⚪ bookmarked_at_locations           
+    DATETIME               ⚪ created                           
+    VARCHAR                ⚪ created_by_                       
+    DATE                   ⚪ dob                               
+    DATE                   ⚪ dod                               
+    VARCHAR                ⚪ email_address                     
+    VARCHAR                ⚪ ethnicity                         
+    VARCHAR                ⚪ ethnicity_other                   
+    VARCHAR                ⚪ fhir_resource_id                  
+    VARCHAR                ⚪ first_name                        
+    BOOLEAN                ⚪ has_been_bookmarked               
+    INTEGER                ⚪ height_in_mm                      
+    VARCHAR                ⚪ highest_education_level           
+    VARCHAR                ⚪ highest_education_level_other     
+    VARCHAR                ⚪ hospital_number                   
+    VARCHAR                ⚪ last_name                         
+    ARRAY                  ⚪ locations                         
+    DATETIME               ⚪ modified                          
+    VARCHAR                ⚪ modified_by_                      
+    VARCHAR                ⚪ nhs_number                        
+    VARCHAR                ⚪ other_notes                       
+    VARCHAR                ⚪ patient_type                      
+    VARCHAR                ⚪ phone_number                      
+    VARCHAR                ⚪ sex                               
+    INTEGER                ⚪ weight_in_g                       
+    +                      child_of                            
+    +                      delivery                            
+    +                      dh_products                         
+    +                      personal_addresses                  
+    +                      record                              
+    +                      terms_agreement                     
+    has_product()                                              
+    recursive_patch()                                          
+    INDEX[hospital_number] » hospital_number_unique_index      
+    INDEX[nhs_number]      » nhs_number_unique_index           
+}
+
+Class Record {
+    VARCHAR[36]       ★ uuid        
+    DATETIME          ⚪ created     
+    VARCHAR           ⚪ created_by_ 
+    DATETIME          ⚪ modified    
+    VARCHAR           ⚪ modified_by_
+    +                 diagnoses     
+    +                 history       
+    +                 notes         
+    +                 patient       
+    +                 pregnancies   
+    +                 visits        
+    recursive_patch()               
+}
+
+Class TermsAgreement {
+    VARCHAR[36] ★ uuid                             
+    VARCHAR     ☆ patient_id                       
+    DATETIME    ⚪ accepted_timestamp               
+    DATETIME    ⚪ created                          
+    VARCHAR     ⚪ created_by_                      
+    DATETIME    ⚪ modified                         
+    VARCHAR     ⚪ modified_by_                     
+    DATETIME    ⚪ patient_notice_accepted_timestamp
+    INTEGER     ⚪ patient_notice_version           
+    VARCHAR     ⚪ product_name                     
+    DATETIME    ⚪ tou_accepted_timestamp           
+    INTEGER     ⚪ tou_version                      
+    INTEGER     ⚪ version                          
+}
+
+Class Visit {
+    VARCHAR[36] ★ uuid          
+    VARCHAR     ☆ record_id     
+    VARCHAR     ⚪ clinician_uuid
+    DATETIME    ⚪ created       
+    VARCHAR     ⚪ created_by_   
+    ARRAY       ⚪ diagnoses     
+    VARCHAR     ⚪ location      
+    DATETIME    ⚪ modified      
+    VARCHAR     ⚪ modified_by_  
+    VARCHAR     ⚪ summary       
+    DATETIME    ⚪ visit_date    
+}
+
+Delivery <--o Pregnancy: pregnancy_id
+
+Delivery <--o Patient: patient_id
+
+Diagnosis <--o Record: record_id
+
+Dose <--o ManagementPlan: management_plan_id
+
+DoseChange <--o Dose: dose_id
+
+DoseHistory <--o ManagementPlan: management_plan_id
+
+DoseHistory <--o Dose: dose_id
+
+DraysonHealthProduct <--o Patient: patient_id
+
+DraysonHealthProductChange <--o DraysonHealthProduct: drayson_health_product_id
+
+History <--o Record: record_id
+
+ManagementPlan <--o Diagnosis: diagnosis_id
+
+NonMedicationAction <--o ManagementPlan: management_plan_id
+
+Note <--o Record: record_id
+
+Pregnancy <--o Record: record_id
+
+ReadingsPlan <--o Diagnosis: diagnosis_id
+
+ReadingsPlanChange <--o ReadingsPlan: readings_plan_id
+
+ObservableEntity <--o Diagnosis: diagnosis_id
+
+PersonalAddress <--o Patient: patient_id
+
+Patient <--o Record: record_id
+
+Patient <--o Patient: parent_patient_id
+
+TermsAgreement <--o Patient: patient_id
+
+Visit <--o Record: record_id
+
+right footer generated by sadisplay v0.4.9
+
+@enduml

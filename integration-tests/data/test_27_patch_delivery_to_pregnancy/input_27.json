@@ -1,0 +1,34 @@
+{
+  "data": {
+    "record": {
+      "pregnancies": [
+        {
+          "deliveries": [
+            {
+              "admitted_to_special_baby_care_unit": false,
+              "apgar_1_minute": 121,
+              "apgar_5_minute": 321,
+              "birth_outcome": "123456",
+              "birth_weight_in_grams": 1005,
+              "feeding_method": "132",
+              "length_of_postnatal_stay_for_baby": 1,
+              "neonatal_complications": [
+                "123456"
+              ],
+              "neonatal_complications_other": "1111999",
+              "outcome_for_baby": "987654"
+            }
+          ],
+          "uuid": "uuid goes here"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/pregnancies/0/uuid",
+      "value_format": "{context.pregnancy_uuid}"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "data": {
+    "record": {
+      "diagnoses": [
+        {
+          "uuid": "diagnosis_id"
+        }
+      ]
+    }
+  },
+  "patches": [
+    {
+      "op": "replace",
+      "path": "/record/diagnoses/0/uuid",
+      "value_format": "{context.diagnosis_uuid}"
+    }
+  ]
+}
