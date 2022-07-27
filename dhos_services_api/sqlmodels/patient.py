@@ -445,27 +445,27 @@ def query_top_level_patients(query: Query) -> Query:
     return a query for the top level patients which matched the query directly
     or where a child matched the query.
     """
+    cte = query.cte("base")
     hierarchy = (
-        db.session.query(Patient.uuid, Patient.uuid.label("top"))
-        .filter(Patient.parent_patient_id == None)
-        .cte(name="hierarchy", recursive=True)
-    )
+        db.session.query(
+            cte.c.uuid.label("uuid"),
+            Patient.parent_patient_id.label("parent_patient_id"),
+        ).join(Patient, Patient.uuid == cte.c.uuid)
+    ).cte(name="hierarchy", recursive=True)
 
-    parent = aliased(hierarchy, name="p")
-    children = aliased(Patient, name="c")
+    child = aliased(hierarchy, name="c")
+    parent = aliased(Patient, name="p")
     hierarchy = hierarchy.union_all(
-        db.session.query(children.uuid, (parent.c.top).label("top")).filter(
-            children.parent_patient_id == parent.c.uuid
+        db.session.query(parent.uuid, parent.parent_patient_id).filter(
+            child.c.parent_patient_id == parent.uuid
         )
     )
-    cte = query.cte("base")
     parents = (
-        db.session.query(hierarchy.c.top)
-        .join(cte, cte.c.uuid == hierarchy.c.uuid)
-        .subquery(name="parents")
-    )
+        db.session.query(hierarchy.c.uuid).filter(hierarchy.c.parent_patient_id == None)
+    ).subquery(name="parents")
+
     parent_query = db.session.query(Patient).join(
-        parents, Patient.uuid == parents.c.top
+        parents, Patient.uuid == parents.c.uuid
     )
     return parent_query
 

@@ -27,6 +27,7 @@ class TestMixedController:
             last_name="Griffin",
             child_of=p1,
             record=Record.new(uuid="R2", history=History.new()),
+            dh_products=[DraysonHealthProduct.new(uuid="DH2", product_name="SEND")],
         )
         p3: Patient = Patient.new(
             uuid="P3",
@@ -39,12 +40,13 @@ class TestMixedController:
         )
         _db.session.commit()
 
+    @pytest.mark.parametrize("mrn", ["MRN3", "MRN2", "MRN1"])
     def test_get_patient_by_product_and_identifer(
-        self, patient_child_children: None, assert_valid_schema: Callable
+        self, patient_child_children: None, assert_valid_schema: Callable, mrn: str
     ) -> None:
         expected = "P1"
         result = mixed_controller.get_patients_by_product_and_identifer(
-            product_name="SEND", identifier_type="mrn", identifier_value="MRN3"
+            product_name="SEND", identifier_type="mrn", identifier_value=mrn
         )
         assert expected == result[0]["uuid"]
         assert_valid_schema(PatientResponse, result, many=True)
