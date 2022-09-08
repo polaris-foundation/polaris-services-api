@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "DHOS Services API"
 authors = ["Rob Grant <rob.grant@sensynehealth.com>"]
 keywords = ["Swagger", "Services", "Patients", "Locations", "Users", "Clinicians"]
-repository = "https://github.com/polaris-foundation/dhos-services-api"
+repository = "https://github.com/polaris-foundation/polaris-services-api"
 
 [tool.poetry.dependencies]
 python = "^3.9,<3.10"
