@@ -13,6 +13,5 @@ pycryptodomex==3.*
 python-jose==3.*
 reportportal-behave-client==1.*
 requests==2.*
-she-data-generation>=1.0.5
 she-logging
 types-requests
