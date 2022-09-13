@@ -48,8 +48,6 @@ services:
     container_name: "dhos-services-api"
     build:
       context: ..
-      args:
-        - GEMFURY_DOWNLOAD_KEY
     environment:
       <<: *COMMON_ENVIRONMENT
       EXTERNAL_URL: http://dhos-services-api:5000
@@ -103,8 +101,6 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
-      args:
-        - PIP_EXTRA_INDEX_URL
     environment:
       <<: *COMMON_ENVIRONMENT
       SYSTEM_JWT_SCOPE: >-
@@ -134,7 +130,7 @@ services:
 
   dhos-locations-api:
     container_name: "dhos-locations-api"
-    image: sensynehealth.azurecr.io/dhos/dhos-locations-api:dev
+    image: ghcr.io/polaris-foundation/polaris-locations-api:latest
     environment:
       <<: *COMMON_ENVIRONMENT
       DATABASE_HOST: postgres-db
@@ -153,7 +149,7 @@ services:
 
   dhos-users-api:
     container_name: "dhos-users-api"
-    image: sensynehealth.azurecr.io/dhos/dhos-users-api:dev
+    image: ghcr.io/polaris-foundation/polaris-users-api:latest
     environment:
       <<: *COMMON_ENVIRONMENT
       DATABASE_HOST: postgres-db
