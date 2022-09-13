@@ -130,7 +130,7 @@ services:
 
   dhos-locations-api:
     container_name: "dhos-locations-api"
-    image: ghcr.io/polaris-foundation/polaris-locations-api:dev
+    image: ghcr.io/polaris-foundation/polaris-locations-api:latest
     environment:
       <<: *COMMON_ENVIRONMENT
       DATABASE_HOST: postgres-db
@@ -149,7 +149,7 @@ services:
 
   dhos-users-api:
     container_name: "dhos-users-api"
-    image: ghcr.io/polaris-foundation/polaris-users-api:dev
+    image: ghcr.io/polaris-foundation/polaris-users-api:latest
     environment:
       <<: *COMMON_ENVIRONMENT
       DATABASE_HOST: postgres-db
